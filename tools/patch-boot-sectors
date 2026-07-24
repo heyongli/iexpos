@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Patch the kernel sector count into boot.bin at the DAP offset."""
+import os, sys
+
+boot, kernel = sys.argv[1], sys.argv[2]
+sz = os.path.getsize(kernel)
+sec = (sz + 511) // 512
+
+with open(boot, 'r+b') as f:
+    f.seek(31)
+    f.write(bytes([sec]))
+
+with open(boot, 'rb') as f:
+    f.seek(31)
+    got = f.read(1)[0]
+
+assert got == sec, f'boot.bin sector count mismatch: expected {sec}, got {got}'

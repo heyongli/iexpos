@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test: serial output contains expected boot markers
-# Checks: PMOK (PM switch), entry (setup_main), Graphics init OK (console),
+# Checks: PMOK (boot PM switch), entry (C main), Graphics init OK (console),
 #         Graphics test complete (full demo ran to end)
 set -e
 
@@ -13,7 +13,7 @@ make -C $DIR clean all
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-sg kvm -c "timeout 10 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none" 2>&1 | tee $TMP_OUT
+sg kvm -c "timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none" 2>&1 | tee $TMP_OUT
 
 echo ""
 echo "=== Verifying output ==="

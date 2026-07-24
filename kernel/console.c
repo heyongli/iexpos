@@ -12,6 +12,7 @@ static int at_line_start = 1;
 static struct console_be *backends[4];
 static int n_be;
 
+/* UART write via outb — never use *(volatile*) for x86 port I/O */
 static void serial_write(const char *s, int len) {
     for (int i = 0; i < len; i++)
         __asm__ volatile("outb %0, %1"

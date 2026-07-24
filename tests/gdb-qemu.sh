@@ -1,9 +1,13 @@
 #!/bin/bash
 # Test: GDB single-step through C entry, verify symbols and stepping work
+# QEMU -gdb tcp::1234 -S (frozen) → GDB batch: hbreak setup_main, continue,
+# backtrace, step, continue. Verifies: hit breakpoint, symbol resolved,
+# backtrace shows C frame, serial output completes normally.
 set -e
 
-DIR=/home/radio/iexpos
-DISK=$DIR/build/vm-raw.img
+DIR="${DIR:-/home/radio/iexpos}"
+DISK="${DISK:-$DIR/build/vm-raw.img}"
+ELF="${ELF:-$DIR/build/kernel.elf}"
 TMP_OUT=/tmp/vm-gdb-output.txt
 GDB_LOG=/tmp/vm-gdb-log.txt
 
@@ -12,11 +16,13 @@ if ! command -v gdb &>/dev/null; then
     exit 0
 fi
 
-echo "=== Building ==="
-make -C $DIR clean all 2>&1 | tail -3
+if [ "$ELF" = "$DIR/build/kernel.elf" ]; then
+    echo "=== Building ==="
+    make -C $DIR clean all 2>&1 | tail -3
+fi
 
-if ! readelf -S $DIR/build/kernel.elf 2>/dev/null | grep -q .debug_info; then
-    echo "  FAIL: kernel.elf missing debug info"
+if ! readelf -S "$ELF" 2>/dev/null | grep -q .debug_info; then
+    echo "  FAIL: $ELF missing debug info"
     exit 1
 fi
 echo "  ELF debug info OK"
@@ -24,13 +30,13 @@ echo "  ELF debug info OK"
 echo ""
 echo "=== GDB single-step test ==="
 
-timeout 15 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
+timeout 18 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
     -hda $DISK -net none -serial file:$TMP_OUT -gdb tcp::1234 -S &
 QEMU_PID=$!
 sleep 0.5
 
 gdb -batch \
-  -ex "file $DIR/build/kernel.elf" \
+  -ex "file $ELF" \
   -ex "set architecture i386:x86-64" \
   -ex "target remote localhost:1234" \
   -ex "hbreak setup_main" \

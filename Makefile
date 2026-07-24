@@ -7,7 +7,7 @@ LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
-       $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o
+       $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
@@ -26,7 +26,10 @@ $(BDIR)/vga.o: bmX86/vga.c bmX86/vga.h kernel/include/font_8x16.h kernel/console
 $(BDIR)/rtc.o: bmX86/rtc.c bmX86/rtc.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h | $(BDIR)
+$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h kernel/gdb_stub.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/gdb_stub.o: kernel/gdb_stub.c kernel/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h | $(BDIR)
@@ -45,6 +48,7 @@ $(BDIR)/kernel.elf: $(OBJS)
 	$(LD) $(LDFLAGS_ELF) $^ -o $@
 
 $(BDIR)/image.bin: $(BDIR)/boot.bin $(BDIR)/kernel.bin
+	tools/patch-boot-sectors $(BDIR)/boot.bin $(BDIR)/kernel.bin; \
 	cat $^ > $@
 
 $(BDIR)/vm-raw.img: $(BDIR)/image.bin
@@ -63,7 +67,11 @@ gdb-qemu: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 	@echo ""
 	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none -s -S"
 
-.PHONY: all run run-curses gdb-qemu clean
+gdb-test: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
+	@echo "=== GDB via QEMU (automated test) ==="
+	DIR=$(CURDIR) tests/gdb-qemu.sh
+
+.PHONY: all run run-curses gdb-qemu gdb-stub-test clean
 
 clean:
-	rm -rf $(BDIR)
+	rm -rf $(BDIR) kernel/*.o

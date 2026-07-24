@@ -1,6 +1,8 @@
 #!/bin/bash
 # Test: framebuffer contains visible pixels (not all-black) after boot
-# Captures QEMU screendump via HMP monitor, samples non-zero pixel values
+# Captures QEMU screendump via HMP monitor, samples non-zero pixel values.
+# QEMU -serial file: → wait "Graphics test complete" → screendump via monitor
+# → parse PPM sample bytes → non-zero sum = framebuffer has content.
 set -e
 
 DIR=/home/radio/iexpos
@@ -16,7 +18,7 @@ echo ""
 echo "=== Booting VM (visual test) ==="
 
 # Launch QEMU with HMP monitor on TCP
-timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
+timeout 16 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
   -hda $DISK -net none \
   -monitor tcp:127.0.0.1:$MON_PORT,server,nowait \
   -serial file:$SER &

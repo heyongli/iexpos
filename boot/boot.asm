@@ -19,7 +19,7 @@ disk_err:
     jmp disk_err
 
 dap:
-    db 0x10, 0x00, 30, 0
+    db 0x10, 0x00, 0, 0     ; sector count patched by Makefile
     dw 0x7E00
     dw 0
     dd 1

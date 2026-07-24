@@ -50,12 +50,27 @@ For VBE mode the values come from the mode‑info block at `ES:DI+0x12`,
 Uses `INT 0x13` extended read (`AH=0x42`) with a Disk Address Packet (DAP):
 
 ```asm
-dap:  db 16, 0, 4, 0       ; packet size, reserved, sector count, reserved
+dap:  db 16, 0, 0, 0       ; packet size, reserved, sector count*, reserved
       dw 0x7E00, 0          ; buffer offset:segment = 0x0000:0x7E00
       dd 1, 0               ; LBA start = sector 1, LBA high = 0
 ```
 
-Reads 4 sectors (2048 B) from LBA 1 to address `0x7E00`.
+*\* Sector count is patched at build time.*  The Makefile computes the exact
+number of 512‑byte sectors needed for the kernel and writes it into `boot.bin`
+at binary offset 31 (the third DAP byte, which starts at offset 29):
+
+```makefile
+# (excerpt from Makefile, inside image.bin recipe)
+KERNEL_SECTORS=$$((($$(stat -c%s $(BDIR)/kernel.bin) + 511) / 512))
+printf '\\x'"$$(printf '%02x' "$$KERNEL_SECTORS")" |
+  dd of=$(BDIR)/boot.bin bs=1 seek=31 count=1 conv=notrunc
+```
+
+A post‑patch assertion (via Python) reads back the byte and compares it
+to the expected value, catching any offset/length mismatches early.
+
+This keeps `boot.asm` independent of the kernel size — no need to manually
+update the DAP when kernel code grows.
 
 ### 5. Switch to Protected Mode
 

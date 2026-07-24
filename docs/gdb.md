@@ -73,3 +73,84 @@ GDB → stub:    $c#00                 (继续执行)
 
 总计 ~260 行。GDB Remote Serial Protocol 的完整参考见
 [dev.ti.com/gdb_remote_protocol](https://dev.ti.com/gdb_remote_protocol)。
+
+---
+
+## 调试实录 (最耗时的 Bug)
+
+### 1. 串口 I/O 误用内存访问（耗时最长）
+
+**现象**：`gdb_break()` 调用后内核完全卡死，无任何串口输出。
+
+**根因**：x86 GCC 中 `*(volatile unsigned char *)0x3F8 = c` 生成的是 `mov` 指令（内存访问）而非 `outb`（端口 I/O）。I/O 端口 0x3F8 属于独立的 I/O 地址空间，不能用内存指令访问。所有 stub 内的串口读写都在操作内存地址 0x3F8（恰好落在实模式 IVT 区域或保护模式未映射区域），而不操作真正的 UART。
+
+**解决**：全部替换为内联汇编 `__asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(0x3F8))` 和 `__asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(0x3FD))`。
+
+**教训**：不要相信 `volatile` 指针能生成端口 I/O；x86 上必须显式使用 `in`/`out` 指令。
+
+### 2. KVM 下 I/O 读循环极慢
+
+**现象**：`gdb_break()` 中 2 000 000 次 `inb(0x3FD)` 循环需要数秒甚至更长。
+
+**根因**：KVM 下每次 `inb` 都会触发 VM‑exit，开销 ~5–100 µs。2 M 次即可达 10 s+，导致内核在等待 GDB 超时前就被外部 `timeout` 杀掉。
+
+**解决**：改用纯内存计数器循环，每 65 536 次迭代才检查一次 LSR。600 M 次内存迭代 + ~9 k 次 I/O 读 ≈ ~6 s 总超时，正常启动时仍可接受。
+
+### 3. `-nographic` 模式下 DR 误触发
+
+**现象**：`gdb_break()` 读 LSR 发现 DR=1，执行 `int $3`，GDB handler 等待串口命令永远不返回。
+
+**根因**：QEMU `-nographic` 将串口连接到终端 stdin。终端上任何数据（包括 shell pipe 残余、按键等）都会设置 UART 的 Data Ready 位。
+
+**解决**：测试场景改用 `-serial tcp:<PORT>,server,nowait` 隔离串口与终端。`gdb_break()` 先 drain 接收缓冲再检查，避免误触发。
+
+### 4. 内核体积超出引导扇区加载能力
+
+**现象**：串口只输出 `PMOK`，之后无任何输出（内核未加载完整）。
+
+**根因**：GDB stub 使 kernel.bin 达到 37 扇区，但 boot 扇区的 DAP 只加载 30 扇区。后 7 扇区未加载，代码执行到缺失部分即崩溃。
+
+**解决**：`boot/boot.asm` 中 DAP block count 从 30 改为 40。
+
+### 5. MCR Loopback 导致串口 RX 不通
+
+详见 `docs/serial.md` §调试实录。
+
+### 6. `gdb_poll` 错误消费触发字节
+
+**现象**：触发 INT3 后 GDB handler 卡死在 `serial_in()` 中，`$T05` 能发出但之后不发任何数据。
+
+**根因**：`gdb_poll()` 在调用 `int $3` 前通过 `serial_in()` 读走了串口触发字节（`+`）。`gdb_handler` 中的 `gdb_recv()` 再调用 `serial_in()` 时 RBR 已空，导致永久阻塞。
+
+**解决**：`gdb_poll` 只检查 LSR.DR 位，不消费字节。INT3 触发后由 `gdb_recv()` 自行读取 RBR。触发字节（如 `+`）会在 `gdb_recv()` 的 `while ((c = serial_in()) != '$')` 循环中被丢弃，不影响后续协议。
+
+### 7. 软件 `int $3` 的 EIP 偏移不应执行
+
+**现象**：continue 后内核崩溃或行为异常。
+
+**根因**：`gdb_handler` 无条件执行 `r->eip--`。对于 0xCC 断点（CPU 将 EIP 指向断点的下一条指令），需要减 1 以重新执行断点处的指令。但对于 `gdb_poll` 中主动执行的 `__asm__("int $3")`，EIP 已指向 `int $3` 的下一条指令，不应该再减。
+
+**解决**：引入 `gdb_from_poll` 标志，仅在非 poll 触发的 INT3 时执行 `r->eip--`：
+
+```c
+// gdb_poll: 软件 int3，不需 EIP 回退
+void gdb_poll(void) {
+    if (inb(0x3FD) & 1) {
+        gdb_active = 1;  gdb_from_poll = 1;
+        __asm__ volatile("int $3");
+        gdb_from_poll = 0;  gdb_active = 0;
+    }
+}
+// gdb_handler: 0xCC 断点时回退，poll 触发的跳过
+if (!gdb_from_poll) r->eip--;
+```
+
+### 串口调试方法论总结
+
+| 操作 | 工具/方法 |
+|------|-----------|
+| 检查 UART 状态 | 在关键路径加 LSR 全量输出（`serial_out(hex(lsr & 0xFF))`） |
+| 检查 loopback | 读 MCR (0x3FC) bit 4 |
+| 检查 RX 通路 | 写测试数据到 chardev，确认 LSR.DR 翻转 + RBR 可读 |
+| 检查 TX 通路 | `serial_out` 写字节，确认 TCP 侧收到 |
+| 测试完整协议 | Python `socket` 模拟 GDB client：`+` → 等 `$T05` → `+$c#63` → 确认回复 `+`

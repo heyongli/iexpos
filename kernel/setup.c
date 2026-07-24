@@ -1,5 +1,6 @@
 #include "baremetal.h"
 #include "demos/demos.h"
+#include "gdb_stub.h"
 
 static void write_dec(int val);
 
@@ -17,16 +18,22 @@ void setup_main(void) {
     write_dec(bm_ui_bpp());
     bm_puts("\n");
 
+    gdb_stub_init();
+    bm_puts("gdb stub init done\n");
+    serial_rw_test();
+
     bm_ui_clear(0x0f1729);
     bm_flush();
     bm_swap();
+
+    bm_puts("gdb stub done\n");
 
     demo_orbit();
 
     bm_puts("Graphics test complete\n");
 
     while (1)
-        ;
+        gdb_poll();
 }
 
 static void write_dec(int val) {
