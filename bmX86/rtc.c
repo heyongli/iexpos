@@ -43,3 +43,7 @@ void write_timestamp(output_fn out) {
     buf[9] = '\0';
     out(buf);
 }
+
+/* baremetal.h API */
+int  bm_rtc_read(unsigned char *h, unsigned char *m, unsigned char *s) { return rtc_read_time(h, m, s); }
+void bm_rtc_format(char buf[9]) { rtc_format_ts(buf); }
