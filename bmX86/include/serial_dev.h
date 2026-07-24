@@ -1,15 +1,17 @@
-#ifndef UART_DEV_H
-#define UART_DEV_H
+#ifndef SERIAL_DEV_H
+#define SERIAL_DEV_H
 
-/* UART device interface */
+#include "uart.h"
 
-struct uart_dev {
+/* Serial device interface */
+
+struct serial_dev {
     void (*write)(const char *s, int len);
     void (*flush)(void);
 };
 
-void uart_dev_init(void);
-void uart_dev_write(const char *s, int len);
-void uart_dev_flush(void);
+void serial_dev_init(void);
+void serial_dev_write(const char *s, int len);
+void serial_dev_flush(void);
 
 #endif

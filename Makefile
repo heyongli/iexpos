@@ -27,9 +27,9 @@ $(BDIR)/rtc.o: bmX86/rtc.c bmX86/rtc.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/uart.o: bmX86/uart.c bmX86/include/uart.h | $(BDIR)
-$(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
-
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h kernel/gdb_stub.h | $(BDIR)
