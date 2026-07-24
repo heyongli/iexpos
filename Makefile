@@ -7,7 +7,7 @@ LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
-       $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o
+        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o $(BDIR)/serial.o $(BDIR)/uart.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
@@ -24,6 +24,12 @@ $(BDIR)/vga.o: bmX86/vga.c bmX86/vga.h kernel/include/font_8x16.h kernel/console
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/rtc.o: bmX86/rtc.c bmX86/rtc.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/uart.o: bmX86/uart.c bmX86/include/uart.h | $(BDIR)
+$(BDIR)/serial.o: bmX86/serial.c bmX86/include/uart_dev.h | $(BDIR)
+
+	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h kernel/gdb_stub.h | $(BDIR)

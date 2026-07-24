@@ -1,5 +1,6 @@
 #include "console.h"
 #include "baremetal.h"
+#include "bmX86/include/uart_dev.h"
 
 #define CON_BUF_SIZE 4096
 
@@ -14,9 +15,7 @@ static int n_be;
 
 /* UART write via outb — never use *(volatile*) for x86 port I/O */
 static void serial_write(const char *s, int len) {
-    for (int i = 0; i < len; i++)
-        __asm__ volatile("outb %0, %1"
-            : : "a"((unsigned char)s[i]), "Nd"((unsigned short)0x3F8));
+    uart_write_buf(s, len);
 }
 
 static struct console_be serial_be = { serial_write, 0 };
