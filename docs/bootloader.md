@@ -6,7 +6,15 @@ A 512‑byte x86 boot sector that transitions the system from real mode
 (16‑bit) to protected mode (32‑bit), sets up a high‑resolution graphics
 mode, loads the kernel from disk, and jumps to it at `0x7E00`.
 
-## Execution Flow
+## Execution Flow (Summary)
+
+```
+BIOS → boot/boot.asm (INT 13h, 加载扇区到 0x7E00)
+     → boot/entry.asm (16→32-bit, LGDT/CR0, PMOK, 跳 0x7E00)
+     → kernel/setup.c (C init + 运行 demo)
+```
+
+## Execution Flow (Detail)
 
 ### 1. Save Boot Drive
 

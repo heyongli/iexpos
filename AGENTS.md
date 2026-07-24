@@ -7,12 +7,6 @@
 > 2. 修改模块时，根据下方索引找到对应文件再 Read，不同时加载无关文件
 > 3. 只读当前任务需要的文件，用完即止
 
-## 执行流
-
-BIOS → `boot/boot.asm` (INT 13h, 加载 30 扇区到 0x7E00)
-     → `boot/entry.asm` (16→32-bit, LGDT/CR0, 跳 setup_main)
-     → `kernel/setup.c` (C init + 运行 demo)
-
 ## 文件索引
 
 > **外部引用文档为参考文档，仅在需要时加载为 context，不预先读取。**
