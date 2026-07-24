@@ -9,7 +9,7 @@ BDIR    = build
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o
 
-all: $(BDIR)/vm-raw.img
+all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
 $(BDIR):
 	mkdir -p $@
