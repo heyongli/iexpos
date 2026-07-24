@@ -1,241 +1,88 @@
-# AGENTS.md — iexpos Development Guide
+# iexpos — 项目文档与工作流指引
 
-## Project Overview
+> 本文件是项目索引，**不需要一次性加载全部内容**。
+> 需要修改某个模块时，根据下方文件说明找到对应文件再 Read。
 
-iexpos is a minimal x86 protected-mode OS in ~800 LOC. Seven source files produce
-two binaries:
+## 执行流
 
-| Binary      | Size  | Description                    |
-|-------------|-------|--------------------------------|
-| `boot.bin`  | 512 B | Loads kernel from disk, jumps  |
-| `kernel.bin`| ~6 KB | PM entry, RTC, graphics, console |
+BIOS → `boot/boot.asm` (INT 13h, 加载 30 扇区到 0x7E00)
+     → `boot/entry.asm` (16→32-bit, LGDT/CR0, 跳 setup_main)
+     → `kernel/setup.c` (C init + 运行 demo)
 
-**Execution flow:**
+## 文件索引
 
-```
-BIOS → boot/boot.asm (real mode, INT 13h)
-   → kernel at 0x7E00: entry.asm (16→32-bit, LGDT/CR0, "PMOK")
-   → setup_main() in kernel/setup.c (C, via baremetal.h API)
-```
+### `boot/` — 引导
+| 文件 | 作用 |
+|------|------|
+| `boot.asm` | 512B MBR, DAP 加载 kernel, 跳 0x7E00 |
+| `entry.asm` | GDT + CR0.PE + far jump, 串口 "PMOK", call setup_main |
 
-`boot.bin` has zero knowledge of graphics or protected mode — it only loads
-sectors (30 sectors via DAP) from disk and jumps to `0x7E00`.
+### `kernel/` — 核心子系统
+| 文件 | 作用 |
+|------|------|
+| `setup.c` | 入口: bm_init → 打印信息 → 运行 demo |
+| `console.c/h` | 4KB 环缓冲 + 时间戳 + 后端分发 (serial/screen) |
+| `include/baremetal.h` | 统一平台 API (bm_puts, bm_ui_\*, bm_swap...) |
+| `include/font_8x16.h` | IBM VGA 8×16 位图字体 (0x20–0x7E) |
 
-## Build & Test
+### `bmX86/` — x86 平台驱动
+| 文件 | 作用 |
+|------|------|
+| `vga.c/h` | PCI/VBE/VGA13 检测 + framebuffer + swap buffer + font render + screen backend |
+| `rtc.c/h` | CMOS RTC via 0x70/0x71, BCD→bin, HH:MM:SS |
+| `include/vbe.h` | VBE info block 结构体定义 |
 
-```bash
-make clean all   # build
-./test.sh        # runs all test suites in tests/
-tests/serial.sh  # build + boot + verify serial output (4 checks)
-tests/visual.sh  # build + boot + screendump + verify non-blank framebuffer
-make run         # build + launch GUI window (via sg kvm)
-```
+### `ui/` — UI 控件
+| 文件 | 作用 |
+|------|------|
+| `ui.c/h` | 进度条: progress_init/set/text, 自动调用 bm_swap |
 
-Passing criteria: serial output must contain `PMOK`, `entry`, `Graphics init OK`,
-`Graphics test complete` (10 s QEMU timeout allows for 5 s RTC animation).
+### `demos/` — 演示
+| 文件 | 作用 |
+|------|------|
+| `demos.h` | demo 入口声明 |
+| `orbit.c` | 4 方块绕屏幕中心旋转 + 进度条动画 (sin/cos LUT) |
 
-## Conventions
+### `tests/` — 测试
+| 文件 | 作用 |
+|------|------|
+| `serial.sh` | 串口输出含 PMOK/entry/Graphics init OK/Graphics test complete |
+| `visual.sh` | QEMU screendump, 校验 framebuffer 非全黑 |
 
-- **C**: freestanding `-m32 -ffreestanding -fno-PIC -nostdlib -fno-asynchronous-unwind-tables`
-- **Assembly (kernel)**: NASM `-f elf32`, linked before C objects to sit at `0x7E00`
-- **Assembly (boot)**: NASM `-f bin`, `[org 0x7c00]`
-- **Linking**: `ld -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n`
-- **No standard library** — no `printf`, `malloc`, `string.h`, etc.
-- **Stack**: `mov esp, 0x7C00` (grows downward from boot sector top)
-
-## Architecture — platform abstraction via `baremetal.h`
-
-`kernel.c` includes only `baremetal.h` — the single platform API header. All
-x86-specific implementation lives under `bmX86/` and `boot/`.
-
-```
-baremetal.h    Unified platform API — console, RTC, bitmap UI
-console.h      Console backend interface (struct console_be)
-console.c      Console subsystem — output cache, timestamps, backend dispatch
-ui.h           Progress bar widget API
-ui.c           Progress bar widget — clean gray gradient, scaled text, drop shadow
-boot/boot.asm   512-byte boot sector — load + jump only (no GDT, no PM switch)
-boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call setup_main
-bmX86/vga.h    struct fb_info (framebuffer geometry)
-bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + screen backend for console
-bmX86/rtc.h    RTC module header
-bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
-font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
-kernel/setup.c  setup_main, write_dec — orchestrates init, runs demos
-
-## Structure
-
-```
-baremetal.h    Unified platform API — console, RTC, bitmap UI
-console.h      Console backend interface (struct console_be)
-console.c      Console subsystem — output cache, timestamps, backend dispatch
-ui/ui.h        Progress bar widget API
-ui/ui.c        Progress bar widget — clean gray gradient, scaled text, drop shadow
-demos/demos.h  Demo entry point declarations
-demos/orbit.c  Orbit rotation demo (sin/cos LUT, 4 rotating squares)
-kernel/setup.c Boot setup: init, print info, run demo(s)
-boot/boot.asm  512-byte boot sector — load + jump only (no GDT, no PM switch)
-boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call setup_main
-bmX86/vga.h    struct fb_info (framebuffer geometry)
-bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + font render + screen backend + swap buffer
-bmX86/rtc.h    RTC module header
-bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
-font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
-```
-```
-
-### entry.asm — the real-mode-to-PM bridge
-
-`entry.asm` is linked **first** so its first byte sits at `0x7E00`. It runs in
-16-bit real mode, loads the GDT, sets CR0.PE, far-jumps to flush the prefetch
-queue, then switches to 32-bit mode, sets up segment registers + stack, prints
-`PMOK` over serial, and `call`s `setup_main`. This is the only assembly that
-touches CPU control registers or the GDT.
-
-### Graphics init — all in C, no BIOS calls
-
-`vga.c` init:
-1. **PCI probe** — scans the PCI bus for a VGA controller (class `0x0300`),
-   reads BAR0 to get the linear framebuffer address
-2. **Bochs VBE** — programs the VBE display via I/O ports `0x1CE/0x1CF`
-   (set 1024×768×32). No INT 0x10 needed — works in protected mode.
-3. **VGA fallback** — if PCI/VBE fails, programs VGA mode 0x13 directly via
-   VGA registers (`0x3C2`–`0x3DA`), 320×200×8 at `0xA0000`.
-
-### Console subsystem
-
-`console.c` owns all output:
-- **4 KB ring buffer** — caches every byte of system output; wraps with
-  `~~(overflow)~~` marker when full
-- **Timestamp** — auto-prepends `HH:MM:SS ` at each new line start
-- **Backend dispatch** — every output byte is forwarded to all registered
-  `console_be` backends (write + optional flush)
-- **Serial backend** — built-in, always available; writes directly to COM1
-- **Screen backend** — registered by `bm_init()` via `console_register_be()`;
-  maintains a 25×80 grid, rendered to framebuffer on `bm_flush()` using the
-  8×16 bitmap font
-
-When a new backend is registered (e.g. screen during `bm_init()`), the full
-4096-byte cache is replayed into it so no early-boot messages are lost.
-
-### baremetal.h API surface
-
-| Function | Purpose | Available before `bm_init()` |
-|----------|---------|----|
-| `bm_puts(s)` | Write string to console (serial + buffer) | Yes |
-| `bm_flush()` | Render buffer to screen | No (no-op) |
-| `bm_init()` | Detect PCI/VBE/VGA, set up framebuffer | — |
-| `bm_rtc_read(h,m,s)` | Read CMOS RTC | Yes |
-| `bm_rtc_format(buf)` | Format as `HH:MM:SS ` | Yes |
-| `bm_ui_ready()` | Non-zero if framebuffer active | After init |
-| `bm_ui_clear(color)` | Clear framebuffer | After init |
-| `bm_ui_fill_rect(...)` | Fill rectangle | After init |
-| `bm_ui_width/height/bpp()` | Framebuffer geometry | After init |
-| `bm_ui_draw_char_sz(x,y,c,fg,sz)` | Scaled char (8·sz × 16·sz px) | After init |
-| `bm_ui_draw_str_sz(x,y,s,fg,sz)` | Scaled string | After init |
-
-Bitmap UI functions are safe to call even when no framebuffer is available
-(they become no-ops).
-
-### Progress bar widget (ui.h / ui.c)
-
-`progress_init()` — draws a 48px-tall bar at screen bottom (slate gray bg).
-`progress_set(p)` — sets 0–100%, renders a clean gray gradient fill with
-`pct%` label (scaled ×2, white text, black shadow).
-`progress_text(s)` — sets info label text on the left (gray, with shadow).
-
-Color scheme: background `0x0f1729`, bar `0x1e293b`, fill gradient
-`0x94a3b8` → `0x64748b`, text `0xf1f5f9`.
-
-### Swap buffer (vga.c)
-
-`bm_swap()` uses **VBE page flipping** (register 9: Y offset). Two framebuffer
-halves at offsets 0 and `fb_size`. After flipping the display, it copies the
-new front buffer → new back buffer via `rep movsb` so both halves stay in
-sync. Callers need only draw incremental changes before the next swap.
-
-For VGA mode 13h fallback (320×200×8), fall back to copy-based swap.
-
-### Animation (kernel.c)
-
-Boot sequence:
-1. Serial init, PCI/VBE/VGA init
-2. Clear screen (`0x0f1729`) + flush console log
-3. Draw 4 centered 96×96 squares (pastel blue/green/pink/amber) as icon grid
-4. Progress bar animates 0→100% while squares orbit screen center (~5 s, 100 frames)
-5. Serial "Graphics test complete"
-
-## Known Gotchas
-
-1. **GDT byte order** — use explicit `dw`/`db` per field, never `dw a,b,c`
-2. **Linker `-n` flag** — required; without it BSS lands at 0xA0000 (VGA RAM)
-3. **Boot entry point** — `entry` in `entry.asm` is the first byte at `0x7E00`
-4. **0x5FC is BIOS data** — don't write there
-5. **VBE bpp** — QEMU reports mode 0x4118 as 24 bpp, not 32 (handled in putpixel)
-
-## Debugging Skills
-
-### Boot markers — pinpoint which stage fails
-
-The serial output has built-in checkpoints. Read them with `run.sh`:
+## 构建与测试
 
 ```bash
-./run.sh
+make clean all           # 构建
+./test.sh                # 运行全部测试
+tests/serial.sh          # 单独串口测试
+tests/visual.sh          # 单独画面测试
 ```
 
-| Marker | Stage | If missing |
-|--------|-------|------------|
-| `PMOK` | entry.asm PM switch | GDT broken, CR0 stuck, or far jump wrong |
-| `entry` | setup_main started | Linkage: `extern setup_main` in entry.asm, or `-e entry` flag |
-| `vga init done` | vga.init() returned | PCI probe hung, Bochs VBE port stuck, or VGA register lockup |
-| `Graphics init OK` | Console buffer working | Console buffer overflow or font rendering crash |
+## 关键约定
 
-### Raw serial — zero-dependency debug output
+- C: `-m32 -ffreestanding -fno-PIC -nostdlib -fno-asynchronous-unwind-tables`
+- ASM kernel: NASM `-f elf32`; boot: NASM `-f bin [org 0x7c00]`
+- 链接: `ld -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n`
+- 无标准库, 栈: `mov esp, 0x7C00`
+- kernel.bin 起始 4 字节即 entry.asm (链接在第一位)
+- 内核加载地址: 0x7E00, BSS 靠 `-n` 避免落到 0xA0000
 
-`bm_puts()` works before `bm_init()` — it writes directly to COM1 with
-no framebuffer dependency. Use it for early boot checkpoints:
+## 调试串口标记
 
-```c
-bm_puts("checkpoint\n");
-```
+| 串口输出 | 含义 | 缺失原因 |
+|----------|------|----------|
+| `PMOK` | entry.asm PM 切换成功 | GDT/CR0/far jump 错误 |
+| `entry` | setup_main 已运行 | extern 或 `-e entry` 问题 |
+| `vga init done` | vga.init() 返回 | PCI/VBE 挂起或 VGA 寄存器问题 |
+| `Graphics init OK` | 控制台缓冲正常 | 字体渲染崩溃或缓冲溢出 |
 
-The console auto-prepends RTC timestamps, so early output looks like:
-`02:48:31 checkpoint`. If `bm_puts` output appears but the next line
-doesn't, the crash is between those two points — no VBE, no PCI to blame.
+`bm_puts()` 在 bm_init 前后都能用, 适合早期调试埋点。
 
-### run.sh — interactive serial console
+## I/O 端口速查
 
-```bash
-./run.sh   # builds + boots, serial on stdio
-```
-
-- Type into the terminal → characters go to COM1
-- `Ctrl-a c` → switch to QEMU monitor
-- `Ctrl-a x` → exit QEMU
-- Useful for testing serial input (keyboard driver, shell, etc.)
-
-### Quick failure analysis
-
-| Symptom | Likely cause |
-|---------|-------------|
-| `PMOK` missing | entry.asm GDT or far jump broken |
-| PMOK OK, `entry` missing | `extern setup_main` not declared, or entry.asm linked after C objects |
-| `entry` OK, `vga init done` missing | PCI bus scan stuck, Bochs VBE ID check failed, or VGA register write hung |
-| Resolution `320x200x8` | PCI probe found no VGA class 0x0300, or BAR0 was 0; check `-vga std` |
-| Rectangles wrong color | 24 bpp vs 32 bpp — QEMU reports 24 but some modes write 4 bytes/pixel |
-| No console text on screen | `bm_flush()` not called, or font data missing from binary |
-
-## Quick Reference
-
-| Address    | Contents                             |
-|------------|--------------------------------------|
-| `0x600`    | `fb_info` (12 B, written by vga.c)   |
-| `0x7C00`   | Boot sector + stack (grows down)     |
-| `0x7E00`   | `entry.asm` first instruction        |
-| `0x10000`  | (unused — was VBE mode info)         |
-| `0xA0000`  | VGA legacy framebuffer               |
-| `0x1CE`    | Bochs VBE index port                 |
-| `0x1CF`    | Bochs VBE data port                  |
-| `0xCF8`    | PCI config address port              |
-| `0xCFC`    | PCI config data port                 |
-| `0x3F8`    | COM1 serial port                     |
+| 端口 | 用途 |
+|------|------|
+| 0x1CE/0x1CF | Bochs VBE index/data |
+| 0xCF8/0xCFC | PCI config address/data |
+| 0x3F8 | COM1 串口 |
+| 0x70/0x71 | CMOS RTC address/data |
