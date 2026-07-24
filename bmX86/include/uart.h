@@ -7,9 +7,10 @@
 #define COM1_LSR        0x3FD      /* Line Status Register */
 
 /* Hardware-level UART operations (I/O port accesses) */
-void uart_write(unsigned char c);              /* write one char to UART */
-unsigned char uart_in(void);                   /* read one char from UART (blocks) */
-void uart_write_buf(const char *s, int len);   /* write buffer */
-int  uart_read_avail(void);                    /* check if data available (non-blocking) */
+void uart_peak_write(unsigned char c);       /* non-blocking write to UART */
+void uart_poll_write(unsigned char c);       /* blocking write, wait for THR empty */
+unsigned char uart_poll_in(void);            /* blocking read, wait for data */
+void uart_write_buf(const char *s, int len); /* write buffer (uses poll_write) */
+int  uart_peak(void);                        /* non-blocking check if data available */
 
 #endif

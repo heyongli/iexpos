@@ -16,14 +16,23 @@
    - Bit 6: TRANSMITTER EMPTY (1 = all data sent)
 */
 
-void uart_write(unsigned char c) {
-    /* Write char to Transmit Holding Register (THR)
-       Hardware automatically writes to shift register */
+void uart_peak_write(unsigned char c) {
+    /* Write char to Transmit Holding Register (THR) without waiting
+       Non-blocking: may lose data if THR is not empty */
     __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
 }
 
-unsigned char uart_in(void) {
-    /* Wait for DATA READY by polling LSR.0
+void uart_poll_write(unsigned char c) {
+    /* Write char to THR, wait for THR empty first (polling) */
+    unsigned char lsr;
+    do {
+        __asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"(COM1_LSR));
+    } while (!(lsr & 0x20));  /* THRE = 0: THR not empty, wait */
+    __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
+}
+
+unsigned char uart_poll_in(void) {
+    /* Blocking poll read: wait for DATA READY by polling LSR.0
        Busy-wait until byte arrives */
     unsigned char lsr;
     do {
@@ -38,14 +47,14 @@ unsigned char uart_in(void) {
 }
 
 void uart_write_buf(const char *s, int len) {
-    /* Write string sequentially using basic uart_write() */
+    /* Write string sequentially using uart_poll_write() */
     for (int i = 0; i < len; i++) {
-        uart_write(s[i]);
+        uart_poll_write(s[i]);
     }
 }
 
-int uart_read_avail(void) {
-    /* Check if data is available (non-blocking)
+int uart_peak(void) {
+    /* Non-blocking peek: check if data is available
        Return 1 if DATA READY, 0 otherwise */
     unsigned char lsr;
     __asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"(COM1_LSR));
