@@ -57,13 +57,13 @@ run: $(BDIR)/vm-raw.img
 run-curses: $(BDIR)/vm-raw.img
 	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -display curses -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none"
 
-debug: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
-	@echo "=== GDB debug ==="
-	@echo "Run: gdb -x debug.gdb"
+gdb-qemu: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
+	@echo "=== GDB via QEMU ==="
+	@echo "Run: gdb -x tests/gdb-qemu.gdb"
 	@echo ""
 	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none -s -S"
 
-.PHONY: all run run-curses debug clean
+.PHONY: all run run-curses gdb-qemu clean
 
 clean:
 	rm -rf $(BDIR)

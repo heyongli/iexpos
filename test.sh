@@ -15,5 +15,11 @@ tests/visual.sh
 
 echo ""
 echo "============================================"
+echo "  Running: GDB single-step tests"
+echo "============================================"
+tests/gdb-qemu.sh
+
+echo ""
+echo "============================================"
 echo "  ALL TESTS PASSED"
 echo "============================================"
