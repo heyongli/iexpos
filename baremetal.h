@@ -24,4 +24,7 @@ int  bm_ui_width(void);
 int  bm_ui_height(void);
 int  bm_ui_bpp(void);
 
+/* swap buffer — copy back buffer to visible framebuffer */
+void bm_swap(void);
+
 #endif

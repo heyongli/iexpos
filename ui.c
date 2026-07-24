@@ -43,6 +43,7 @@ static void draw_bar(void) {
         for (i = 0; i < len; i++)
             bm_ui_draw_char_sz(bx + 4 + i * cw, ty, cur_txt[i], INF_C, tsz);
     }
+    bm_swap();
 }
 
 void progress_init(void) {

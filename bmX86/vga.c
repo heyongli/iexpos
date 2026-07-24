@@ -5,6 +5,12 @@
 
 static struct fb_info fb;
 static volatile unsigned char *fb_mem;
+static volatile unsigned char *real_fb;
+static int fb_size;
+static int flip_active;
+
+#define VBE_VW    6
+#define VBE_YOFF  9
 
 static void putpixel(int x, int y, unsigned int color);
 static void draw_char(int x, int y, char c, unsigned int color);
@@ -175,6 +181,8 @@ static int vbe_try_init(void) {
     vbe_write_reg(VBE_XRES, 1024);
     vbe_write_reg(VBE_YRES, 768);
     vbe_write_reg(VBE_BPP, 32);
+    vbe_write_reg(VBE_VW, 1024);
+    vbe_write_reg(VBE_YOFF, 0);
     vbe_write_reg(VBE_ENABLE, VBE_ENABLED | VBE_LFB_ENABLED);
     return 1;
 }
@@ -270,13 +278,16 @@ static void init(void) {
         fb.bpp    = 8;
         fb.addr   = 0xA0000;
     }
-    fb_mem = (volatile unsigned char *)fb.addr;
+    fb_size = fb.width * fb.height * (fb.bpp / 8);
+    real_fb = (volatile unsigned char *)fb.addr;
+    flip_active = 0;
+    fb_mem = (fb.bpp == 32) ? (real_fb + fb_size) : real_fb;
     {
         struct fb_info *h = (struct fb_info *)0x600;
         h->width  = fb.width;
         h->height = fb.height;
         h->bpp    = fb.bpp;
-        h->addr   = fb.addr;
+        h->addr   = (unsigned int)real_fb;
     }
     console_register_be(&scr_be);
 }
@@ -323,3 +334,28 @@ void bm_ui_draw_str_sz(int x, int y, const char *s, unsigned int fg, int sz) {
 int  bm_ui_width(void) { return fb.width; }
 int  bm_ui_height(void) { return fb.height; }
 int  bm_ui_bpp(void) { return fb.bpp; }
+
+void bm_swap(void) {
+    if (!real_fb) return;
+    if (fb.bpp == 32) {
+        volatile unsigned char *new_front = fb_mem;
+        flip_active ^= 1;
+        vbe_write_reg(VBE_YOFF, flip_active ? fb.height : 0);
+        volatile unsigned char *new_back = real_fb + (flip_active ? 0 : fb_size);
+        __asm__ volatile(
+            "cld\n\trep movsb\n"
+            : : "S"(new_front), "D"(new_back), "c"(fb_size)
+            : "memory"
+        );
+        fb_mem = new_back;
+    } else {
+        unsigned int n = fb_size;
+        void *src = (void *)fb_mem;
+        void *dst = (void *)real_fb;
+        __asm__ volatile(
+            "cld\n\trep movsb\n"
+            : : "S"(src), "D"(dst), "c"(n)
+            : "memory"
+        );
+    }
+}

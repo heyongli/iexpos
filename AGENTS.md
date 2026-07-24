@@ -19,7 +19,7 @@ BIOS → boot/boot.asm (real mode, INT 13h)
 ```
 
 `boot.bin` has zero knowledge of graphics or protected mode — it only loads
-sectors (20 sectors via DAP) from disk and jumps to `0x7E00`.
+sectors (30 sectors via DAP) from disk and jumps to `0x7E00`.
 
 ## Build & Test
 
