@@ -19,7 +19,7 @@ BIOS → boot/boot.asm (real mode, INT 13h)
 ```
 
 `boot.bin` has zero knowledge of graphics or protected mode — it only loads
-sectors (15 sectors via DAP) from disk and jumps to `0x7E00`.
+sectors (20 sectors via DAP) from disk and jumps to `0x7E00`.
 
 ## Build & Test
 
@@ -30,7 +30,7 @@ make run         # build + launch GUI window (via sg kvm)
 ```
 
 Passing criteria: serial output must contain `PMOK`, `entry`, `Graphics init OK`,
-`Graphics test complete`.
+`Graphics test complete` (10 s QEMU timeout allows for 5 s RTC animation).
 
 ## Conventions
 
@@ -50,6 +50,8 @@ x86-specific implementation lives under `bmX86/` and `boot/`.
 baremetal.h    Unified platform API — console, RTC, bitmap UI
 console.h      Console backend interface (struct console_be)
 console.c      Console subsystem — output cache, timestamps, backend dispatch
+ui.h           Progress bar widget API
+ui.c           Progress bar widget — clean gray gradient, scaled text, drop shadow
 boot/boot.asm  512-byte boot sector — load + jump only (no GDT, no PM switch)
 entry.asm      PM transition stub at 0x7E00: LGDT, CR0, far jump, call kernel_main
 bmX86/vga.h    struct fb_info (framebuffer geometry)
@@ -57,7 +59,7 @@ bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + screen backend for console
 bmX86/rtc.h    RTC module header
 bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
 font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
-kernel.c       kernel_main, write_dec — orchestrates init and test
+kernel.c       kernel_main, write_dec — orchestrates init, 4-icon display, 5s RTC animation
 ```
 
 ### entry.asm — the real-mode-to-PM bridge
@@ -107,9 +109,30 @@ When a new backend is registered (e.g. screen during `bm_init()`), the full
 | `bm_ui_clear(color)` | Clear framebuffer | After init |
 | `bm_ui_fill_rect(...)` | Fill rectangle | After init |
 | `bm_ui_width/height/bpp()` | Framebuffer geometry | After init |
+| `bm_ui_draw_char_sz(x,y,c,fg,sz)` | Scaled char (8·sz × 16·sz px) | After init |
+| `bm_ui_draw_str_sz(x,y,s,fg,sz)` | Scaled string | After init |
 
 Bitmap UI functions are safe to call even when no framebuffer is available
 (they become no-ops).
+
+### Progress bar widget (ui.h / ui.c)
+
+`progress_init()` — draws a 48px-tall bar at screen bottom (slate gray bg).
+`progress_set(p)` — sets 0–100%, renders a clean gray gradient fill with
+`pct%` label (scaled ×2, white text, black shadow).
+`progress_text(s)` — sets info label text on the left (gray, with shadow).
+
+Color scheme: background `0x0f1729`, bar `0x1e293b`, fill gradient
+`0x94a3b8` → `0x64748b`, text `0xf1f5f9`.
+
+### Animation (kernel.c)
+
+Boot sequence:
+1. Serial init, PCI/VBE/VGA init
+2. Clear screen (`0x0f1729`) + flush console log
+3. Draw 4 centered 96×96 squares (pastel blue/green/pink/amber) as icon grid
+4. Progress bar animates 0→100% using RTC timing (~5 seconds)
+5. Serial "Graphics test complete"
 
 ## Known Gotchas
 

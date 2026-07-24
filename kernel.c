@@ -8,14 +8,7 @@ void kernel_main(void) {
     bm_init();
     bm_puts("vga init done\n");
 
-    progress_init();
-    progress_text("console");
-    progress_set(20);
-
     bm_puts("Graphics init OK\n");
-    progress_set(40);
-    progress_text("resolution");
-
     bm_puts("Resolution: ");
     write_dec(bm_ui_width());
     bm_puts("x");
@@ -23,27 +16,34 @@ void kernel_main(void) {
     bm_puts("x");
     write_dec(bm_ui_bpp());
     bm_puts("\n");
-    progress_set(60);
-    progress_text("render");
 
-    bm_ui_clear(0x001020);
+    bm_ui_clear(0x0f1729);
     bm_flush();
-    progress_set(75);
-    progress_text("rectangles");
 
-    bm_ui_fill_rect(50,  420, 200, 200, 0x0000FF);
-    bm_ui_fill_rect(300, 420, 200, 200, 0x00FF00);
-    bm_ui_fill_rect(550, 420, 200, 200, 0xFF0000);
-    bm_ui_fill_rect(50,  660, 200, 200, 0xFFFF00);
-    bm_ui_fill_rect(300, 660, 200, 200, 0x00FFFF);
-    bm_ui_fill_rect(550, 660, 200, 200, 0xFF00FF);
-    progress_set(90);
-    progress_text("done");
+    bm_ui_fill_rect(412, 420, 96, 96, 0x60a5fa);
+    bm_ui_fill_rect(516, 420, 96, 96, 0x34d399);
+    bm_ui_fill_rect(412, 524, 96, 96, 0xf472b6);
+    bm_ui_fill_rect(516, 524, 96, 96, 0xfbbf24);
+
+    progress_init();
+    {
+        unsigned char h, m, s0;
+        int cur = 0;
+        bm_rtc_read(&h, &m, &s0);
+        progress_set(0);
+        while (cur < 100) {
+            unsigned char s;
+            bm_rtc_read(&h, &m, &s);
+            int diff = s - s0;
+            if (diff < 0) diff += 60;
+            int t = diff * 20;
+            if (t > 100) t = 100;
+            while (cur < t) { cur++; progress_set(cur); }
+        }
+        progress_text("done");
+    }
 
     bm_puts("Graphics test complete\n");
-    bm_flush();
-    progress_set(100);
-    progress_text("done");
 
     while (1)
         ;

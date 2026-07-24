@@ -10,7 +10,7 @@ make -C $DIR clean all
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-sg kvm -c "timeout 5 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none" 2>&1 | tee $TMP_OUT
+sg kvm -c "timeout 10 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none" 2>&1 | tee $TMP_OUT
 
 echo ""
 echo "=== Verifying output ==="

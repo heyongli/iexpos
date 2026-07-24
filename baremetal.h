@@ -18,6 +18,8 @@ void bm_ui_clear(unsigned int color);
 void bm_ui_fill_rect(int x, int y, int w, int h, unsigned int color);
 void bm_ui_draw_char(int x, int y, unsigned char c, unsigned int fg, unsigned int bg);
 void bm_ui_draw_str(int x, int y, const char *s, unsigned int fg, unsigned int bg);
+void bm_ui_draw_char_sz(int x, int y, unsigned char c, unsigned int fg, int sz);
+void bm_ui_draw_str_sz(int x, int y, const char *s, unsigned int fg, int sz);
 int  bm_ui_width(void);
 int  bm_ui_height(void);
 int  bm_ui_bpp(void);

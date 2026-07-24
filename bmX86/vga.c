@@ -281,6 +281,24 @@ static void init(void) {
     console_register_be(&scr_be);
 }
 
+static void draw_char_scaled(int x, int y, char c, unsigned int color, int sz) {
+    unsigned char ch = (unsigned char)c;
+    if (ch < FONT_FIRST || ch > FONT_LAST) ch = '?';
+    if (ch < FONT_FIRST) return;
+    unsigned int idx = ch - FONT_FIRST;
+    int row, col, dy, dx;
+    for (row = 0; row < FONT_HEIGHT; row++) {
+        unsigned char bits = font8x16[idx][row];
+        for (col = 0; col < FONT_WIDTH; col++) {
+            if (!(bits & (0x80 >> col)))
+                continue;
+            for (dy = 0; dy < sz; dy++)
+                for (dx = 0; dx < sz; dx++)
+                    putpixel(x + col * sz + dx, y + row * sz + dy, color);
+        }
+    }
+}
+
 /* ---- baremetal.h API ---- */
 
 void bm_init(void) { init(); }
@@ -293,6 +311,13 @@ void bm_ui_draw_str(int x, int y, const char *s, unsigned int fg, unsigned int b
     while (*s) {
         draw_char(x, y, *s++, fg);
         x += FONT_WIDTH;
+    }
+}
+void bm_ui_draw_char_sz(int x, int y, unsigned char c, unsigned int fg, int sz) { draw_char_scaled(x, y, (char)c, fg, sz); }
+void bm_ui_draw_str_sz(int x, int y, const char *s, unsigned int fg, int sz) {
+    while (*s) {
+        draw_char_scaled(x, y, *s++, fg, sz);
+        x += FONT_WIDTH * sz;
     }
 }
 int  bm_ui_width(void) { return fb.width; }
