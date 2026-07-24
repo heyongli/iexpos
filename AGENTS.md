@@ -48,11 +48,13 @@ x86-specific implementation lives under `bmX86/` and `boot/`.
 
 ```
 baremetal.h    Unified platform API — console, RTC, bitmap UI
+console.h      Console backend interface (struct console_be)
+console.c      Console subsystem — output cache, timestamps, backend dispatch
 boot/boot.asm  512-byte boot sector — load + jump only (no GDT, no PM switch)
 entry.asm      PM transition stub at 0x7E00: LGDT, CR0, far jump, call kernel_main
-bmX86/vga.h    struct fb_info, struct fb_ops (ops include console + draw)
-bmX86/vga.c    Framebuffer driver + Bochs VBE + VGA mode 13 + console + font
-bmX86/rtc.h    RTC module header — declares rtc_read_time, rtc_format_ts, write_timestamp
+bmX86/vga.h    struct fb_info (framebuffer geometry)
+bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + screen backend for console
+bmX86/rtc.h    RTC module header
 bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
 font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
 kernel.c       kernel_main, write_dec — orchestrates init and test
@@ -76,15 +78,21 @@ touches CPU control registers or the GDT.
 3. **VGA fallback** — if PCI/VBE fails, programs VGA mode 0x13 directly via
    VGA registers (`0x3C2`–`0x3DA`), 320×200×8 at `0xA0000`.
 
-### Console buffer
+### Console subsystem
 
-All kernel messages go through `bm_puts()` which:
-- Outputs to COM1 serial (for test verification)
-- Appends to an internal 25×80 ring buffer
-- After `bm_flush()`, renders all buffered text on screen using
-  the 8×16 bitmap font, and subsequent writes also update the screen
-- Auto-prepends RTC timestamp (`HH:MM:SS `) at the start of each new line
-  via `bm_rtc_format()`, output to both serial and buffer
+`console.c` owns all output:
+- **4 KB ring buffer** — caches every byte of system output; wraps with
+  `~~(overflow)~~` marker when full
+- **Timestamp** — auto-prepends `HH:MM:SS ` at each new line start
+- **Backend dispatch** — every output byte is forwarded to all registered
+  `console_be` backends (write + optional flush)
+- **Serial backend** — built-in, always available; writes directly to COM1
+- **Screen backend** — registered by `bm_init()` via `console_register_be()`;
+  maintains a 25×80 grid, rendered to framebuffer on `bm_flush()` using the
+  8×16 bitmap font
+
+When a new backend is registered (e.g. screen during `bm_init()`), the full
+4096-byte cache is replayed into it so no early-boot messages are lost.
 
 ### baremetal.h API surface
 
@@ -98,8 +106,6 @@ All kernel messages go through `bm_puts()` which:
 | `bm_ui_ready()` | Non-zero if framebuffer active | After init |
 | `bm_ui_clear(color)` | Clear framebuffer | After init |
 | `bm_ui_fill_rect(...)` | Fill rectangle | After init |
-| `bm_ui_draw_char(...)` | Draw bitmap char | After init |
-| `bm_ui_draw_str(...)` | Draw bitmap string | After init |
 | `bm_ui_width/height/bpp()` | Framebuffer geometry | After init |
 
 Bitmap UI functions are safe to call even when no framebuffer is available

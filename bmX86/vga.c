@@ -287,6 +287,14 @@ void bm_init(void) { init(); }
 int  bm_ui_ready(void) { return fb.addr != 0; }
 void bm_ui_clear(unsigned int color) { clear(color); }
 void bm_ui_fill_rect(int x, int y, int w, int h, unsigned int color) { fill_rect(x, y, w, h, color); }
+void bm_ui_draw_char(int x, int y, unsigned char c, unsigned int fg, unsigned int bg) { (void)bg; draw_char(x, y, (char)c, fg); }
+void bm_ui_draw_str(int x, int y, const char *s, unsigned int fg, unsigned int bg) {
+    (void)bg;
+    while (*s) {
+        draw_char(x, y, *s++, fg);
+        x += FONT_WIDTH;
+    }
+}
 int  bm_ui_width(void) { return fb.width; }
 int  bm_ui_height(void) { return fb.height; }
 int  bm_ui_bpp(void) { return fb.bpp; }
