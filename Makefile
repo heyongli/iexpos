@@ -1,7 +1,7 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -I bmX86 -I ui -I demos -I kernel -I kernel/include
+CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I demos -I kernel -I kernel/include
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
 LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build

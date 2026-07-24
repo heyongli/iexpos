@@ -1,6 +1,7 @@
 #include "gdb_stub.h"
+#include "bmX86/include/uart.h"
+#include "io_defs.h"
 
-#define COM1            0x3F8
 #define IDT_ENTRIES     256
 #define BP_TABLE_SIZE   32
 
@@ -36,21 +37,6 @@ static struct {
 static volatile int gdb_active;
 static volatile int gdb_from_poll;
 
-/* serial — must use outb/inb (x86 port I/O), NOT *(volatile *) memory access.
-   GCC on x86 compiles *(0x3F8) to mov, which writes to memory, not UART. */
-static void serial_out(char c) {
-    __asm__ volatile("outb %0, %1" : : "a"((unsigned char)c), "Nd"((unsigned short)COM1));
-}
-static char serial_in(void) {
-    unsigned char lsr;
-    do {
-        __asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"((unsigned short)0x3FD));
-    } while (!(lsr & 1));
-    unsigned char c;
-    __asm__ volatile("inb %1, %0" : "=a"(c) : "Nd"((unsigned short)COM1));
-    return c;
-}
-
 /* hex */
 static char hex(unsigned char v) {
     return v < 10 ? '0' + v : 'a' + v - 10;
@@ -65,11 +51,11 @@ static int h2v(char c) {
 /* send $payload#ck — GDB packet framing */
 static void gdb_send(const char *data) {
     unsigned char ck = 0;
-    serial_out('$');
-    for (const char *p = data; *p; p++) { ck += *p; serial_out(*p); }
-    serial_out('#');
-    serial_out(hex(ck >> 4));
-    serial_out(hex(ck & 0xF));
+    uart_poll_write('$');
+    for (const char *p = data; *p; p++) { ck += *p; uart_poll_write(*p); }
+    uart_poll_write('#');
+    uart_poll_write(hex(ck >> 4));
+    uart_poll_write(hex(ck & 0xF));
 }
 
 /* read a packet into buf, return 1 on success
@@ -78,17 +64,17 @@ static int gdb_recv(char *buf, int max) {
     int pos = 0;
     unsigned char ck = 0;
     char c;
-    while ((c = serial_in()) != '$');
+    while ((c = uart_poll_in()) != '$');
     while (pos < max - 1) {
-        c = serial_in();
+        c = uart_poll_in();
         if (c == '#') break;
         buf[pos++] = c;
     }
     buf[pos] = 0;
-    int hi = h2v(serial_in()), lo = h2v(serial_in());
+    int hi = h2v(uart_poll_in()), lo = h2v(uart_poll_in());
     for (int i = 0; i < pos; i++) ck += (unsigned char)buf[i];
-    if ((hi << 4 | lo) != ck) { serial_out('-'); return 0; }
-    serial_out('+');
+    if ((hi << 4 | lo) != ck) { uart_poll_write('-'); return 0; }
+    uart_poll_write('+');
     return 1;
 }
 
@@ -306,10 +292,7 @@ static void gdb_handler_wrap(struct regs *r) {
 }
 
 void gdb_stub_init(void) {
-    /* Clear MCR (0x3FC) — QEMU default leaves Loopback (bit 4) set,
-       which disconnects the chardev (TCP/file) from UART RX.  Without
-       this, external bytes never reach RBR and LSR.DR stays 0. */
-    __asm__ volatile("outb %0, %1" : : "a"((unsigned char)0), "Nd"((unsigned short)0x3FC));
+    uart_init();
     for (int i = 0; i < IDT_ENTRIES; i++)
         set_gate(i, (unsigned int)&default_tramp);
     set_gate(1, (unsigned int)&int1_tramp);
@@ -318,52 +301,41 @@ void gdb_stub_init(void) {
 }
 
 /* Serial loopback test: verify THR→RBR round-trip.
-   Enables loopback, writes 4 test bytes, reads each back with
-   LSR.DR wait, compares.  Outputs SRW:P/F marker for tests. */
+    Enables loopback via MCR, writes 4 test bytes, reads each back
+    with uart_poll_in (which waits for READ_READY), compares.
+    Outputs SRW:P/F marker for tests. */
 void serial_rw_test(void) {
     const unsigned char test[4] = { 0x55, 0xAA, '!', '\n' };
     unsigned char ok = 1;
 
+    /* Enable loopback mode: set Loopback bit (4) in MCR.
+       The uart layer does not yet abstract MCR configuration. */
     __asm__ volatile("outb %0, %1"
-        : : "a"((unsigned char)0x10), "Nd"((unsigned short)0x3FC));
+        : : "a"((unsigned char)0x10), "Nd"((unsigned short)COM1_MCR));
 
     for (int i = 0; i < 4; i++) {
-        __asm__ volatile("outb %0, %1"
-            : : "a"(test[i]), "Nd"((unsigned short)0x3F8));
-        unsigned char lsr;
-        do {
-            __asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"((unsigned short)0x3FD));
-        } while (!(lsr & 1));
-        unsigned char got;
-        __asm__ volatile("inb %1, %0" : "=a"(got) : "Nd"((unsigned short)0x3F8));
+        uart_poll_write(test[i]);
+        unsigned char got = uart_poll_in();
         if (got != test[i]) ok = 0;
     }
 
+    /* Disable loopback mode: clear MCR */
     __asm__ volatile("outb %0, %1"
-        : : "a"((unsigned char)0), "Nd"((unsigned short)0x3FC));
+        : : "a"((unsigned char)0), "Nd"((unsigned short)COM1_MCR));
 
-    serial_out('S');
-    serial_out('R');
-    serial_out('W');
-    serial_out(':');
-    serial_out(ok ? 'P' : 'F');
-    serial_out('\n');
-}
-
-static unsigned char inb(unsigned short port) {
-    unsigned char v;
-    __asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(port));
-    return v;
-}
-static void outb(unsigned char v, unsigned short port) {
-    __asm__ volatile("outb %0, %1" : : "a"(v), "Nd"(port));
+    uart_poll_write('S');
+    uart_poll_write('R');
+    uart_poll_write('W');
+    uart_poll_write(':');
+    uart_poll_write(ok ? 'P' : 'F');
+    uart_poll_write('\n');
 }
 
 void gdb_poll(void) {
-    /* Check LSR.DR — do NOT read RBR here.  The byte must remain for
+    /* Check UART read readiness — do NOT read RBR here.  The byte must remain for
        gdb_recv() inside the INT3 handler to consume.  If we read it now,
        gdb_recv will block forever waiting for the $ start-of-packet. */
-    if (inb(0x3FD) & 1) {
+    if (uart_peak() & READ_READY) {
         gdb_active = 1;
         gdb_from_poll = 1;       /* tell gdb_handler: don't adjust EIP */
         __asm__ volatile("int $3");
