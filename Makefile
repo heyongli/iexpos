@@ -1,8 +1,9 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -I bmX86 -I ui -I demos -I kernel -I kernel/include
+CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -I bmX86 -I ui -I demos -I kernel -I kernel/include
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
+LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
@@ -40,6 +41,9 @@ $(BDIR)/orbit.o: demos/orbit.c demos/demos.h kernel/include/baremetal.h ui/ui.h 
 $(BDIR)/kernel.bin: $(OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@
 
+$(BDIR)/kernel.elf: $(OBJS)
+	$(LD) $(LDFLAGS_ELF) $^ -o $@
+
 $(BDIR)/image.bin: $(BDIR)/boot.bin $(BDIR)/kernel.bin
 	cat $^ > $@
 
@@ -53,7 +57,13 @@ run: $(BDIR)/vm-raw.img
 run-curses: $(BDIR)/vm-raw.img
 	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -display curses -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none"
 
-.PHONY: all run run-curses clean
+debug: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
+	@echo "=== GDB debug ==="
+	@echo "Run: gdb -x debug.gdb"
+	@echo ""
+	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none -s -S"
+
+.PHONY: all run run-curses debug clean
 
 clean:
 	rm -rf $(BDIR)

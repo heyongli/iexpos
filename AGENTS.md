@@ -49,6 +49,11 @@ BIOS → `boot/boot.asm` (INT 13h, 加载 30 扇区到 0x7E00)
 | `serial.sh` | 串口输出含 PMOK/entry/Graphics init OK/Graphics test complete |
 | `visual.sh` | QEMU screendump, 校验 framebuffer 非全黑 |
 
+### 根目录
+| 文件 | 作用 |
+|------|------|
+| `debug.gdb` | GDB 脚本: 加载 kernel.elf, 连接 QEMU, 停在 setup_main |
+
 ## 构建与测试
 
 ```bash
@@ -77,6 +82,46 @@ tests/visual.sh          # 单独画面测试
 | `Graphics init OK` | 控制台缓冲正常 | 字体渲染崩溃或缓冲溢出 |
 
 `bm_puts()` 在 bm_init 前后都能用, 适合早期调试埋点。
+
+## GDB 调试
+
+```bash
+make debug              # 构建 + 启动 QEMU (等待 GDB 连接, 端口 1234)
+```
+
+在另一个终端:
+```bash
+gdb -x debug.gdb        # 加载 ELF + 连接 + 停在 setup_main 入口
+```
+
+或手动:
+```bash
+gdb build/kernel.elf
+(gdb) target remote localhost:1234
+(gdb) break setup_main
+(gdb) continue
+```
+
+### debug.gdb 说明
+
+| 命令 | 作用 |
+|------|------|
+| `file build/kernel.elf` | 加载符号 (含 DWARF 源码级调试) |
+| `target remote :1234` | 连接 QEMU GDB server |
+| `break setup_main` | 在 C 入口设断点 |
+| `continue` | 放行到断点 |
+
+### 关键符号地址
+
+| 符号 | 地址 | 说明 |
+|------|------|------|
+| `entry` | `0x7E00` | entry.asm 第一条指令 |
+| `setup_main` | kernel/setup.c | C 入口 (建议首断点) |
+| `bm_init` | bmX86/vga.c | PCI/VBE/VGA 初始化 |
+| `demo_orbit` | demos/orbit.c | orbit 动画入口 |
+
+调试时可用 `info functions`, `list`, `step`, `next`, `print var` 等标准 GDB 指令。
+如果不需要 KVM (单步更准确), 可将 `make debug` 中的 `-enable-kvm` 去掉。
 
 ## I/O 端口速查
 
