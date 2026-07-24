@@ -1,15 +1,7 @@
 # build artifacts
+build/
 *.o
-boot.bin
-kernel.bin
-image.bin
-kernel.map
 test.sh.pass
-
-# VM images
-vm-raw.img
-vm.qcow2
-*.raw
 
 # old cruft (pre-cleanup leftovers)
 start_kvm_vm.sh

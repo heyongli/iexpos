@@ -4,7 +4,7 @@
 set -e
 
 DIR=/home/radio/iexpos
-DISK=$DIR/vm-raw.img
+DISK=$DIR/build/vm-raw.img
 SER=/tmp/qemu-vm-serial
 SCR=/tmp/qemu-vm-screendump.ppm
 MON_PORT=4444

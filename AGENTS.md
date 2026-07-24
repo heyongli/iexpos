@@ -52,7 +52,7 @@ BIOS → `boot/boot.asm` (INT 13h, 加载 30 扇区到 0x7E00)
 ## 构建与测试
 
 ```bash
-make clean all           # 构建
+make clean all           # 构建 (产物在 build/)
 ./test.sh                # 运行全部测试
 tests/serial.sh          # 单独串口测试
 tests/visual.sh          # 单独画面测试

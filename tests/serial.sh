@@ -5,7 +5,7 @@
 set -e
 
 DIR=~/iexpos
-DISK=$DIR/vm-raw.img
+DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-test-output.txt
 
 echo "=== Building ==="

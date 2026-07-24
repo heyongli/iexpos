@@ -5,13 +5,13 @@ set -e
 echo "============================================"
 echo "  Running: serial output tests"
 echo "============================================"
-./tests/serial.sh
+tests/serial.sh
 
 echo ""
 echo "============================================"
 echo "  Running: visual output tests"
 echo "============================================"
-./tests/visual.sh
+tests/visual.sh
 
 echo ""
 echo "============================================"
