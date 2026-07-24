@@ -51,12 +51,11 @@ BIOS → `boot/boot.asm` (INT 13h, 加载 30 扇区到 0x7E00)
 | `gdb-qemu.sh` | GDB (via QEMU) 单步跟踪: 断点 setup_main/demo_orbit, step, print |
 | `gdb-qemu.gdb` | GDB 脚本: 加载 kernel.elf, 连接 QEMU, 停在 setup_main |
 
-### 根目录
-
 ### `docs/`
 | 文件 | 作用 |
 |------|------|
 | `gdb-qemu.md` | GDB (via QEMU) 调试文档: 改动/原理/用法/测试 |
+| `gdb.md` | GDB stub 自实现: 协议/IDT/串口/断点表/工作量估算 |
 
 ## 构建与测试
 
