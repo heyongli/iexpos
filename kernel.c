@@ -1,5 +1,5 @@
 #include "baremetal.h"
-#include "progress.h"
+#include "ui.h"
 
 static void write_dec(int val);
 

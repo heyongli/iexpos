@@ -18,16 +18,16 @@ bmX86/vga.o: bmX86/vga.c bmX86/vga.h font_8x16.h console.h baremetal.h
 bmX86/rtc.o: bmX86/rtc.c bmX86/rtc.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel.o: kernel.c baremetal.h progress.h
+kernel.o: kernel.c baremetal.h ui.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 console.o: console.c console.h baremetal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-progress.o: progress.c progress.h baremetal.h
+ui.o: ui.c ui.h baremetal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel.bin: entry.o console.o progress.o bmX86/rtc.o kernel.o bmX86/vga.o
+kernel.bin: entry.o console.o ui.o bmX86/rtc.o kernel.o bmX86/vga.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 image.bin: boot.bin kernel.bin
@@ -46,4 +46,4 @@ run-curses: vm-raw.img
 .PHONY: all run run-curses clean
 
 clean:
-	rm -f boot.bin entry.o console.o progress.o bmX86/rtc.o bmX86/vga.o kernel.o kernel.bin image.bin vm-raw.img
+	rm -f boot.bin entry.o console.o ui.o bmX86/rtc.o bmX86/vga.o kernel.o kernel.bin image.bin vm-raw.img

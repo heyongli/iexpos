@@ -1,4 +1,4 @@
-#include "progress.h"
+#include "ui.h"
 #include "baremetal.h"
 
 #define BAR_H  20
