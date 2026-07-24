@@ -31,15 +31,10 @@
 - tests/serial.sh 串口测试
 - tests/visual.sh 画面测试
 - tests/gdb-qemu.sh QEMU单步跟踪
-
 - docs/gdb-qemu.md QEMU GDB文档
 - docs/gdb.md GDB stub实现
 - docs/serial.md 串口设计
 - docs/io-ports.md I/O端口速查
-| 文件 | 作用 |
-|------|------|
-| `gdb-qemu.md` | GDB (via QEMU) 调试文档: 改动/原理/用法/测试 |
-| `gdb.md` | GDB stub 自实现: 协议/IDT/串口/断点表/工作量估算 |
 
 ## 构建与测试
 
