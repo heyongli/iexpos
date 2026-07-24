@@ -6,7 +6,6 @@ test.sh.pass
 # old cruft (pre-cleanup leftovers)
 start_kvm_vm.sh
 DESIGN.md
-docs/
 
 # editor / OS droppings
 .vscode/
