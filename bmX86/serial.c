@@ -1,4 +1,4 @@
-#include "include/uart_dev.h"
+#include "include/serial_dev.h"
 #include "include/uart.h"
 
 static struct serial_dev dev;
