@@ -1,0 +1,8 @@
+*.o
+boot.bin
+kernel.bin
+image.bin
+vm-raw.img
+vm.qcow2
+kernel.map
+test.sh.pass
