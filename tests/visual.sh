@@ -1,4 +1,6 @@
 #!/bin/bash
+# Test: framebuffer contains visible pixels (not all-black) after boot
+# Captures QEMU screendump via HMP monitor, samples non-zero pixel values
 set -e
 
 DIR=/home/radio/iexpos

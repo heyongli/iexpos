@@ -1,4 +1,5 @@
 #!/bin/bash
+# Runner: executes all test suites in tests/
 set -e
 
 echo "============================================"
