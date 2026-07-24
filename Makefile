@@ -1,7 +1,7 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -I bmX86
+CFLAGS  = -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -I bmX86 -I ui -I demos -I kernel -I kernel/include
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
 
 all: vm-raw.img
@@ -12,22 +12,25 @@ boot.bin: boot/boot.asm
 entry.o: boot/entry.asm
 	$(AS) -f elf32 $< -o $@
 
-bmX86/vga.o: bmX86/vga.c bmX86/vga.h font_8x16.h console.h baremetal.h
+bmX86/vga.o: bmX86/vga.c bmX86/vga.h kernel/include/font_8x16.h kernel/console.h kernel/include/baremetal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 bmX86/rtc.o: bmX86/rtc.c bmX86/rtc.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel.o: kernel.c baremetal.h ui.h
+kernel/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-console.o: console.c console.h baremetal.h
+kernel/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-ui.o: ui.c ui.h baremetal.h
+ui/ui.o: ui/ui.c ui/ui.h kernel/include/baremetal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel.bin: entry.o console.o ui.o bmX86/rtc.o kernel.o bmX86/vga.o
+demos/orbit.o: demos/orbit.c demos/demos.h kernel/include/baremetal.h ui/ui.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+kernel.bin: entry.o kernel/console.o ui/ui.o bmX86/rtc.o kernel/setup.o bmX86/vga.o demos/orbit.o
 	$(LD) $(LDFLAGS) $^ -o $@
 
 image.bin: boot.bin kernel.bin
@@ -46,4 +49,4 @@ run-curses: vm-raw.img
 .PHONY: all run run-curses clean
 
 clean:
-	rm -f boot.bin entry.o console.o ui.o bmX86/rtc.o bmX86/vga.o kernel.o kernel.bin image.bin vm-raw.img
+	rm -f boot.bin entry.o kernel/console.o ui/ui.o bmX86/rtc.o bmX86/vga.o kernel/setup.o demos/orbit.o kernel.bin image.bin vm-raw.img

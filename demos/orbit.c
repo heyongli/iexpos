@@ -1,3 +1,4 @@
+#include "demos.h"
 #include "baremetal.h"
 #include "ui.h"
 
@@ -70,68 +71,35 @@ static const int sin_tab[256] = {
   -49,  -43,  -37,  -31,  -25,  -18,  -12,  -6,
 };
 
-static void write_dec(int val);
-
-void kernel_main(void) {
+void demo_orbit(void) {
     int i;
-    bm_puts("entry\n");
-    bm_init();
-    bm_puts("vga init done\n");
+    unsigned int cols[4] = {0x60a5fa, 0x34d399, 0xf472b6, 0xfbbf24};
+    int off[8] = { -52, -52, 52, -52, -52, 52, 52, 52 };
+    int cx = 512, cy = 360, sq = 96;
+    unsigned char h, m, s0;
 
-    bm_puts("Graphics init OK\n");
-    bm_puts("Resolution: ");
-    write_dec(bm_ui_width());
-    bm_puts("x");
-    write_dec(bm_ui_height());
-    bm_puts("x");
-    write_dec(bm_ui_bpp());
-    bm_puts("\n");
-
-    bm_ui_clear(0x0f1729);
-    bm_flush();
+    bm_rtc_read(&h, &m, &s0);
+    for (i = 0; i < 4; i++)
+        bm_ui_fill_rect(cx + off[i*2] - sq / 2, cy + off[i*2+1] - sq / 2, sq, sq, cols[i]);
     bm_swap();
-
+    progress_init();
     {
-        unsigned int cols[4] = {0x60a5fa, 0x34d399, 0xf472b6, 0xfbbf24};
-        int off[8] = { -52, -52, 52, -52, -52, 52, 52, 52 };
-        int cx = 512, cy = 360, sq = 96;
-        unsigned char h, m, s0;
-        bm_rtc_read(&h, &m, &s0);
-        for (i = 0; i < 4; i++)
-            bm_ui_fill_rect(cx + off[i*2] - sq / 2, cy + off[i*2+1] - sq / 2, sq, sq, cols[i]);
-        bm_swap();
-        progress_init();
-        {
-            int p;
-            for (p = 1; p <= 100; p++) {
-                bm_ui_clear(0x0f1729);
-                bm_flush();
-                for (i = 0; i < 4; i++) {
-                    int a = p * 3;
-                    int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
-                    int ry = (off[i*2] * sin_tab[a & 255] + off[i*2+1] * cos_tab[a & 255]) / 256;
-                    bm_ui_fill_rect(cx + rx - sq / 2, cy + ry - sq / 2, sq, sq, cols[i]);
-                }
-                progress_set(p);
-                {
-                    volatile int d;
-                    for (d = 0; d < 25000000; d++);
-                }
+        int p;
+        for (p = 1; p <= 100; p++) {
+            bm_ui_clear(0x0f1729);
+            bm_flush();
+            for (i = 0; i < 4; i++) {
+                int a = p * 3;
+                int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
+                int ry = (off[i*2] * sin_tab[a & 255] + off[i*2+1] * cos_tab[a & 255]) / 256;
+                bm_ui_fill_rect(cx + rx - sq / 2, cy + ry - sq / 2, sq, sq, cols[i]);
             }
-            progress_text("done");
+            progress_set(p);
+            {
+                volatile int d;
+                for (d = 0; d < 25000000; d++);
+            }
         }
+        progress_text("done");
     }
-
-    bm_puts("Graphics test complete\n");
-
-    while (1)
-        ;
-}
-
-static void write_dec(int val) {
-    char buf[12], *p = buf + sizeof(buf);
-    *--p = 0;
-    if (!val) *--p = '0';
-    while (val) { *--p = '0' + val % 10; val /= 10; }
-    bm_puts(p);
 }

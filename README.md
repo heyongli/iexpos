@@ -8,9 +8,9 @@ and renders a bitmap-font console with colour rectangles on screen.
 ```
 baremetal.h    →  platform API (console, RTC, bitmap UI)
 boot/          →  real-mode loader (512 B, INT 13h, jump to 0x7E00)
-entry.asm      →  16→32-bit PM stub (GDT, CR0, far jump, call kernel_main)
+entry.asm      →  16→32-bit PM stub (GDT, CR0, far jump, call setup_main)
 bmX86/         →  x86 bare-metal driver layer
-kernel.c       →  kernel_main: init, test, infinite loop
+kernel/setup.c  →  setup_main: init, test, infinite loop
 ```
 
 - **Console** (`bm_puts` / `bm_flush`) — writes to COM1 serial + 25×80 buffer,

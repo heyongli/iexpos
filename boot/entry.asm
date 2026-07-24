@@ -1,7 +1,7 @@
 [bits 16]
 section .text
 global entry
-extern kernel_main
+extern setup_main
 
 entry:
     cli
@@ -33,7 +33,7 @@ pm_start:
     mov al, 0x0A
     out dx, al
 
-    call kernel_main
+    call setup_main
     hlt
 
 gdt:

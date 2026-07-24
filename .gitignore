@@ -12,7 +12,6 @@ vm.qcow2
 *.raw
 
 # old cruft (pre-cleanup leftovers)
-vbe.h
 start_kvm_vm.sh
 DESIGN.md
 docs/

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test: serial output contains expected boot markers
-# Checks: PMOK (PM switch), entry (kernel_main), Graphics init OK (console),
+# Checks: PMOK (PM switch), entry (setup_main), Graphics init OK (console),
 #         Graphics test complete (full demo ran to end)
 set -e
 

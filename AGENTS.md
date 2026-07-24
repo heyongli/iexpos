@@ -15,7 +15,7 @@ two binaries:
 ```
 BIOS → boot/boot.asm (real mode, INT 13h)
    → kernel at 0x7E00: entry.asm (16→32-bit, LGDT/CR0, "PMOK")
-   → kernel_main() in kernel.c (C, via baremetal.h API)
+   → setup_main() in kernel/setup.c (C, via baremetal.h API)
 ```
 
 `boot.bin` has zero knowledge of graphics or protected mode — it only loads
@@ -55,13 +55,33 @@ console.c      Console subsystem — output cache, timestamps, backend dispatch
 ui.h           Progress bar widget API
 ui.c           Progress bar widget — clean gray gradient, scaled text, drop shadow
 boot/boot.asm   512-byte boot sector — load + jump only (no GDT, no PM switch)
-boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call kernel_main
+boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call setup_main
 bmX86/vga.h    struct fb_info (framebuffer geometry)
 bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + screen backend for console
 bmX86/rtc.h    RTC module header
 bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
 font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
-kernel.c       kernel_main, write_dec — orchestrates init, 4-icon display, 5s RTC animation
+kernel/setup.c  setup_main, write_dec — orchestrates init, runs demos
+
+## Structure
+
+```
+baremetal.h    Unified platform API — console, RTC, bitmap UI
+console.h      Console backend interface (struct console_be)
+console.c      Console subsystem — output cache, timestamps, backend dispatch
+ui/ui.h        Progress bar widget API
+ui/ui.c        Progress bar widget — clean gray gradient, scaled text, drop shadow
+demos/demos.h  Demo entry point declarations
+demos/orbit.c  Orbit rotation demo (sin/cos LUT, 4 rotating squares)
+kernel/setup.c Boot setup: init, print info, run demo(s)
+boot/boot.asm  512-byte boot sector — load + jump only (no GDT, no PM switch)
+boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call setup_main
+bmX86/vga.h    struct fb_info (framebuffer geometry)
+bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + font render + screen backend + swap buffer
+bmX86/rtc.h    RTC module header
+bmX86/rtc.c    CMOS RTC driver via ports 0x70/0x71, BCD→bin, HH:MM:SS format
+font_8x16.h    IBM VGA 8×16 bitmap font (ASCII 0x20–0x7E, Linux kernel source)
+```
 ```
 
 ### entry.asm — the real-mode-to-PM bridge
@@ -69,7 +89,7 @@ kernel.c       kernel_main, write_dec — orchestrates init, 4-icon display, 5s 
 `entry.asm` is linked **first** so its first byte sits at `0x7E00`. It runs in
 16-bit real mode, loads the GDT, sets CR0.PE, far-jumps to flush the prefetch
 queue, then switches to 32-bit mode, sets up segment registers + stack, prints
-`PMOK` over serial, and `call`s `kernel_main`. This is the only assembly that
+`PMOK` over serial, and `call`s `setup_main`. This is the only assembly that
 touches CPU control registers or the GDT.
 
 ### Graphics init — all in C, no BIOS calls
@@ -166,7 +186,7 @@ The serial output has built-in checkpoints. Read them with `run.sh`:
 | Marker | Stage | If missing |
 |--------|-------|------------|
 | `PMOK` | entry.asm PM switch | GDT broken, CR0 stuck, or far jump wrong |
-| `entry` | kernel_main started | Linkage: `extern kernel_main` in entry.asm, or `-e entry` flag |
+| `entry` | setup_main started | Linkage: `extern setup_main` in entry.asm, or `-e entry` flag |
 | `vga init done` | vga.init() returned | PCI probe hung, Bochs VBE port stuck, or VGA register lockup |
 | `Graphics init OK` | Console buffer working | Console buffer overflow or font rendering crash |
 
@@ -199,7 +219,7 @@ doesn't, the crash is between those two points — no VBE, no PCI to blame.
 | Symptom | Likely cause |
 |---------|-------------|
 | `PMOK` missing | entry.asm GDT or far jump broken |
-| PMOK OK, `entry` missing | `extern kernel_main` not declared, or entry.asm linked after C objects |
+| PMOK OK, `entry` missing | `extern setup_main` not declared, or entry.asm linked after C objects |
 | `entry` OK, `vga init done` missing | PCI bus scan stuck, Bochs VBE ID check failed, or VGA register write hung |
 | Resolution `320x200x8` | PCI probe found no VGA class 0x0300, or BAR0 was 0; check `-vga std` |
 | Rectangles wrong color | 24 bpp vs 32 bpp — QEMU reports 24 but some modes write 4 bytes/pixel |
