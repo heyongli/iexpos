@@ -138,6 +138,17 @@ void gdb_poll(void) {
 
 验证通过后，进一步通过 TCP 全双工测试确认 TX 和 RX 可同时工作（GDB 协议双向通信）。
 
+## 调试串口标记
+
+| 串口输出 | 含义 | 缺失原因 |
+|----------|------|----------|
+| `PMOK` | entry.asm PM 切换成功 | GDT/CR0/far jump 错误 |
+| `entry` | setup_main 已运行 | extern 或 `-e entry` 问题 |
+| `vga init done` | vga.init() 返回 | PCI/VBE 挂起或 VGA 寄存器问题 |
+| `Graphics init OK` | 控制台缓冲正常 | 字体渲染崩溃或缓冲溢出 |
+
+`bm_puts()` 在 bm_init 前后都能用，适合早期调试埋点。
+
 ## 测试覆盖
 
 | 测试文件 | 验证点 | 手段 |
