@@ -11,47 +11,31 @@
 
 > **外部引用文档为参考文档，仅在需要时加载为 context，不预先读取。**
 
-### `boot/` — 引导
-| 文件 | 作用 |
-|------|------|
-| `boot.asm` | 512B MBR, DAP 加载 kernel, 跳 0x7E00 |
-| `entry.asm` | GDT + CR0.PE + far jump, 串口 "PMOK", call setup_main |
+- boot/boot.asm 引导加载内核
+- boot/entry.asm GDT+CR0, 跳 setup_main
 
-### `kernel/` — 核心子系统
-| 文件 | 作用 |
-|------|------|
-| `setup.c` | 入口: bm_init → 打印信息 → 运行 demo |
-| `console.c/h` | 4KB 环缓冲 + 时间戳 + 后端分发 (serial/screen) |
-| `include/baremetal.h` | 统一平台 API (bm_puts, bm_ui_\*, bm_swap...) |
-| `include/font_8x16.h` | IBM VGA 8×16 位图字体 (0x20–0x7E) |
+- kernel/setup.c 入口, bm_init, 打印, 运行demo
+- kernel/console.c/h 环缓冲, 后端分发
+- include/baremetal.h 统一平台 API
+- include/font_8x16.h 字体
 
-### `bmX86/` — x86 平台驱动
-| 文件 | 作用 |
-|------|------|
-| `vga.c/h` | PCI/VBE/VGA13 检测 + framebuffer + swap buffer + font render + screen backend |
-| `rtc.c/h` | CMOS RTC via 0x70/0x71, BCD→bin, HH:MM:SS |
-| `include/vbe.h` | VBE info block 结构体定义 |
+- bmX86/vga.c/h VGA驱动
+- bmX86/rtc.c/h RTC驱动
+- include/vbe.h VBE结构体
 
-### `ui/` — UI 控件
-| 文件 | 作用 |
-|------|------|
-| `ui.c/h` | 进度条: progress_init/set/text, 自动调用 bm_swap |
+- ui/ui.c/h 进度条
 
-### `demos/` — 演示
-| 文件 | 作用 |
-|------|------|
-| `demos.h` | demo 入口声明 |
-| `orbit.c` | 4 方块绕屏幕中心旋转 + 进度条动画 (sin/cos LUT) |
+- demos/demos.h demo入口
+- demos/orbit.c 旋转动画
 
-### `tests/` — 测试
-| 文件 | 作用 |
-|------|------|
-| `serial.sh` | 串口输出含 PMOK/entry/Graphics init OK/Graphics test complete |
-| `visual.sh` | QEMU screendump, 校验 framebuffer 非全黑 |
-| `gdb-qemu.sh` | GDB (via QEMU) 单步跟踪: 断点 setup_main/demo_orbit, step, print |
-| `gdb-qemu.gdb` | GDB 脚本: 加载 kernel.elf, 连接 QEMU, 停在 setup_main |
+- tests/serial.sh 串口测试
+- tests/visual.sh 画面测试
+- tests/gdb-qemu.sh QEMU单步跟踪
 
-### `docs/`
+- docs/gdb-qemu.md QEMU GDB文档
+- docs/gdb.md GDB stub实现
+- docs/serial.md 串口设计
+- docs/io-ports.md I/O端口速查
 | 文件 | 作用 |
 |------|------|
 | `gdb-qemu.md` | GDB (via QEMU) 调试文档: 改动/原理/用法/测试 |
