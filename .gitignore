@@ -1,8 +1,28 @@
+# build artifacts
 *.o
 boot.bin
 kernel.bin
 image.bin
-vm-raw.img
-vm.qcow2
 kernel.map
 test.sh.pass
+
+# VM images
+vm-raw.img
+vm.qcow2
+*.raw
+
+# old cruft (pre-cleanup leftovers)
+vbe.h
+start_kvm_vm.sh
+DESIGN.md
+README.md
+docs/
+
+# editor / OS droppings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
