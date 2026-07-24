@@ -105,6 +105,7 @@ void kernel_main(void) {
             int p;
             for (p = 1; p <= 100; p++) {
                 bm_ui_clear(0x0f1729);
+                bm_flush();
                 for (i = 0; i < 4; i++) {
                     int a = p * 3;
                     int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;

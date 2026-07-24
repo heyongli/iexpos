@@ -25,7 +25,9 @@ sectors (30 sectors via DAP) from disk and jumps to `0x7E00`.
 
 ```bash
 make clean all   # build
-./test.sh        # build + boot in QEMU + verify serial output (4 checks)
+./test.sh        # runs all test suites in tests/
+tests/serial.sh  # build + boot + verify serial output (4 checks)
+tests/visual.sh  # build + boot + screendump + verify non-blank framebuffer
 make run         # build + launch GUI window (via sg kvm)
 ```
 
@@ -125,13 +127,22 @@ Bitmap UI functions are safe to call even when no framebuffer is available
 Color scheme: background `0x0f1729`, bar `0x1e293b`, fill gradient
 `0x94a3b8` → `0x64748b`, text `0xf1f5f9`.
 
+### Swap buffer (vga.c)
+
+`bm_swap()` uses **VBE page flipping** (register 9: Y offset). Two framebuffer
+halves at offsets 0 and `fb_size`. After flipping the display, it copies the
+new front buffer → new back buffer via `rep movsb` so both halves stay in
+sync. Callers need only draw incremental changes before the next swap.
+
+For VGA mode 13h fallback (320×200×8), fall back to copy-based swap.
+
 ### Animation (kernel.c)
 
 Boot sequence:
 1. Serial init, PCI/VBE/VGA init
 2. Clear screen (`0x0f1729`) + flush console log
 3. Draw 4 centered 96×96 squares (pastel blue/green/pink/amber) as icon grid
-4. Progress bar animates 0→100% using RTC timing (~5 seconds)
+4. Progress bar animates 0→100% while squares orbit screen center (~5 s, 100 frames)
 5. Serial "Graphics test complete"
 
 ## Known Gotchas
