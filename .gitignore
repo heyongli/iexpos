@@ -15,7 +15,6 @@ vm.qcow2
 vbe.h
 start_kvm_vm.sh
 DESIGN.md
-README.md
 docs/
 
 # editor / OS droppings
