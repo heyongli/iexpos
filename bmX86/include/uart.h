@@ -19,6 +19,5 @@ void uart_init(void);              /* clear MCR loopback, init UART硬件 */
 void uart_peak_write(unsigned char c);       /* non-blocking write to UART */
 void uart_poll_write(unsigned char c);       /* blocking write, wait for THR empty */
 unsigned char uart_poll_in(void);            /* blocking read, wait for data */
-void uart_write_buf(const char *s, int len); /* write buffer (uses poll_write) */
 
 #endif

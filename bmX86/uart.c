@@ -45,12 +45,6 @@ unsigned char uart_poll_in(void) {
     return c;
 }
 
-void uart_write_buf(const char *s, int len) {
-    for (int i = 0; i < len; i++) {
-        uart_poll_write(s[i]);
-    }
-}
-
 void uart_init(void) {
     /* Clear MCR (0x3FC) — QEMU default leaves Loopback (bit 4) set,
        which disconnects the chardev (TCP/file) from UART RX.  Without

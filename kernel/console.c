@@ -13,9 +13,9 @@ static int at_line_start = 1;
 static struct console_be *backends[4];
 static int n_be;
 
-/* UART write via outb — never use *(volatile*) for x86 port I/O */
+/* UART write via serial device layer */
 static void serial_write(const char *s, int len) {
-    uart_write_buf(s, len);
+    serial_dev_write(s, len);
 }
 
 static struct console_be serial_be = { serial_write, 0 };
