@@ -54,8 +54,8 @@ console.h      Console backend interface (struct console_be)
 console.c      Console subsystem — output cache, timestamps, backend dispatch
 ui.h           Progress bar widget API
 ui.c           Progress bar widget — clean gray gradient, scaled text, drop shadow
-boot/boot.asm  512-byte boot sector — load + jump only (no GDT, no PM switch)
-entry.asm      PM transition stub at 0x7E00: LGDT, CR0, far jump, call kernel_main
+boot/boot.asm   512-byte boot sector — load + jump only (no GDT, no PM switch)
+boot/entry.asm  PM transition stub at 0x7E00: LGDT, CR0, far jump, call kernel_main
 bmX86/vga.h    struct fb_info (framebuffer geometry)
 bmX86/vga.c    Framebuffer driver + PCI/VBE/VGA13 + screen backend for console
 bmX86/rtc.h    RTC module header

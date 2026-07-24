@@ -9,7 +9,7 @@ all: vm-raw.img
 boot.bin: boot/boot.asm
 	$(AS) -f bin $< -o $@
 
-entry.o: entry.asm
+entry.o: boot/entry.asm
 	$(AS) -f elf32 $< -o $@
 
 bmX86/vga.o: bmX86/vga.c bmX86/vga.h font_8x16.h console.h baremetal.h
