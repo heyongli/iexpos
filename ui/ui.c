@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "baremetal.h"
+#include "io.h"
 
 #define BAR_H  48
 #define BAR_C  0x1e293b
@@ -47,7 +48,7 @@ static void draw_bar(void) {
 }
 
 void progress_init(void) {
-    if (!bm_ui_ready()) return;
+    if (bm_ui_ready() != _IO_OK) return;
     bw = bm_ui_width();
     bx = 0;
     by = bm_ui_height() - BAR_H;
