@@ -1,7 +1,9 @@
 #include "rtc.h"
+#include "io.h"
 
 #define CMOS_ADDR 0x70
 #define CMOS_DATA 0x71
+#define RTC_UPDATE_IN_PROGRESS BIT(7)
 
 static unsigned char cmos_read(unsigned char reg) {
     unsigned char val, addr = reg | 0x80;
@@ -15,18 +17,18 @@ static unsigned char bcd(unsigned char v) {
 }
 
 int rtc_read_time(unsigned char *h, unsigned char *m, unsigned char *s) {
-    while (cmos_read(0x0A) & 0x80);
+    while (cmos_read(0x0A) & RTC_UPDATE_IN_PROGRESS);
     cmos_read(0x00);
-    while (cmos_read(0x0A) & 0x80);
+    while (cmos_read(0x0A) & RTC_UPDATE_IN_PROGRESS);
     *s = bcd(cmos_read(0x00));
     *m = bcd(cmos_read(0x02));
     *h = bcd(cmos_read(0x04));
-    return 1;
+    return _IO_OK;
 }
 
 void rtc_format_ts(char buf[9]) {
     unsigned char h, m, s;
-    if (!rtc_read_time(&h, &m, &s)) {
+    if (rtc_read_time(&h, &m, &s) != _IO_OK) {
         buf[0] = '?'; buf[1] = '?'; buf[2] = ':';
         buf[3] = '?'; buf[4] = '?'; buf[5] = ':';
         buf[6] = '?'; buf[7] = '?'; buf[8] = ' ';

@@ -2,6 +2,7 @@
 #include "font_8x16.h"
 #include "console.h"
 #include "baremetal.h"
+#include "io.h"
 
 static struct fb_info fb;
 static volatile unsigned char *fb_mem;
@@ -159,9 +160,9 @@ static unsigned int pci_find_vga_bar0(void) {
 #define VBE_YRES    2
 #define VBE_BPP     3
 #define VBE_ENABLE  4
-#define VBE_DISABLED     0x00
-#define VBE_ENABLED      0x01
-#define VBE_LFB_ENABLED  0x40
+#define VBE_DISABLED     0
+#define VBE_ENABLED      BIT(0)
+#define VBE_LFB_ENABLED  BIT(6)
 
 static unsigned short vbe_read_reg(unsigned short idx) {
     outw(VBE_PORT_IDX, idx);
@@ -176,7 +177,7 @@ static void vbe_write_reg(unsigned short idx, unsigned short val) {
 static int vbe_try_init(void) {
     vbe_write_reg(VBE_ID, 0xB0C0);
     if (vbe_read_reg(VBE_ID) < 0xB0C0)
-        return 0;
+        return _NOT_READY;
     vbe_write_reg(VBE_ENABLE, VBE_DISABLED);
     vbe_write_reg(VBE_XRES, 1024);
     vbe_write_reg(VBE_YRES, 768);
@@ -184,7 +185,7 @@ static int vbe_try_init(void) {
     vbe_write_reg(VBE_VW, 1024);
     vbe_write_reg(VBE_YOFF, 0);
     vbe_write_reg(VBE_ENABLE, VBE_ENABLED | VBE_LFB_ENABLED);
-    return 1;
+    return _IO_OK;
 }
 
 /* ---- VGA mode 0x13 ---- */
@@ -266,7 +267,7 @@ static void clear(unsigned int color) {
 
 static void init(void) {
     unsigned int bar0 = pci_find_vga_bar0();
-    if (bar0 && vbe_try_init()) {
+    if (bar0 && vbe_try_init() == _IO_OK) {
         fb.width  = 1024;
         fb.height = 768;
         fb.bpp    = 32;
@@ -313,7 +314,7 @@ static void draw_char_scaled(int x, int y, char c, unsigned int color, int sz) {
 /* ---- baremetal.h API ---- */
 
 void bm_init(void) { init(); }
-int  bm_ui_ready(void) { return fb.addr != 0; }
+int  bm_ui_ready(void) { return fb.addr ? _IO_OK : _NOT_READY; }
 void bm_ui_clear(unsigned int color) { clear(color); }
 void bm_ui_fill_rect(int x, int y, int w, int h, unsigned int color) { fill_rect(x, y, w, h, color); }
 void bm_ui_draw_char(int x, int y, unsigned char c, unsigned int fg, unsigned int bg) { (void)bg; draw_char(x, y, (char)c, fg); }

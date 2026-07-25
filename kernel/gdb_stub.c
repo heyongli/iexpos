@@ -1,6 +1,6 @@
 #include "gdb_stub.h"
 #include "bmX86/include/uart.h"
-#include "io_defs.h"
+#include "io.h"
 
 #define IDT_ENTRIES     256
 #define BP_TABLE_SIZE   32
@@ -51,11 +51,11 @@ static int h2v(char c) {
 /* send $payload#ck — GDB packet framing */
 static void gdb_send(const char *data) {
     unsigned char ck = 0;
-    uart_poll_write('$');
-    for (const char *p = data; *p; p++) { ck += *p; uart_poll_write(*p); }
-    uart_poll_write('#');
-    uart_poll_write(hex(ck >> 4));
-    uart_poll_write(hex(ck & 0xF));
+    uart_busy_write('$');
+    for (const char *p = data; *p; p++) { ck += *p; uart_busy_write(*p); }
+    uart_busy_write('#');
+    uart_busy_write(hex(ck >> 4));
+    uart_busy_write(hex(ck & 0xF));
 }
 
 /* read a packet into buf, return 1 on success
@@ -63,18 +63,23 @@ static void gdb_send(const char *data) {
 static int gdb_recv(char *buf, int max) {
     int pos = 0;
     unsigned char ck = 0;
-    char c;
-    while ((c = uart_poll_in()) != '$');
+    unsigned char c;
+    int rc;
+    do { rc = uart_busy_read(&c); } while (rc == _IO_OK && c != '$');
     while (pos < max - 1) {
-        c = uart_poll_in();
+        rc = uart_busy_read(&c);
+        if (rc != _IO_OK) break;
         if (c == '#') break;
         buf[pos++] = c;
     }
     buf[pos] = 0;
-    int hi = h2v(uart_poll_in()), lo = h2v(uart_poll_in());
+    rc = uart_busy_read(&c);
+    int hi = (rc == _IO_OK) ? h2v(c) : 0;
+    rc = uart_busy_read(&c);
+    int lo = (rc == _IO_OK) ? h2v(c) : 0;
     for (int i = 0; i < pos; i++) ck += (unsigned char)buf[i];
-    if ((hi << 4 | lo) != ck) { uart_poll_write('-'); return 0; }
-    uart_poll_write('+');
+    if ((hi << 4 | lo) != ck) { uart_busy_write('-'); return 0; }
+    uart_busy_write('+');
     return 1;
 }
 
@@ -302,7 +307,7 @@ void gdb_stub_init(void) {
 
 /* Serial loopback test: verify THR→RBR round-trip.
     Enables loopback via MCR, writes 4 test bytes, reads each back
-    with uart_poll_in (which waits for READ_READY), compares.
+    with uart_busy_read (which waits for _READ_READY, aborts on _io_abort), compares.
     Outputs SRW:P/F marker for tests. */
 void serial_rw_test(void) {
     const unsigned char test[4] = { 0x55, 0xAA, '!', '\n' };
@@ -314,8 +319,9 @@ void serial_rw_test(void) {
         : : "a"((unsigned char)0x10), "Nd"((unsigned short)COM1_MCR));
 
     for (int i = 0; i < 4; i++) {
-        uart_poll_write(test[i]);
-        unsigned char got = uart_poll_in();
+        uart_busy_write(test[i]);
+        unsigned char got;
+        uart_busy_read(&got);
         if (got != test[i]) ok = 0;
     }
 
@@ -323,19 +329,19 @@ void serial_rw_test(void) {
     __asm__ volatile("outb %0, %1"
         : : "a"((unsigned char)0), "Nd"((unsigned short)COM1_MCR));
 
-    uart_poll_write('S');
-    uart_poll_write('R');
-    uart_poll_write('W');
-    uart_poll_write(':');
-    uart_poll_write(ok ? 'P' : 'F');
-    uart_poll_write('\n');
+    uart_busy_write('S');
+    uart_busy_write('R');
+    uart_busy_write('W');
+    uart_busy_write(':');
+    uart_busy_write(ok ? 'P' : 'F');
+    uart_busy_write('\n');
 }
 
 void gdb_poll(void) {
     /* Check UART read readiness — do NOT read RBR here.  The byte must remain for
-       gdb_recv() inside the INT3 handler to consume.  If we read it now,
-       gdb_recv will block forever waiting for the $ start-of-packet. */
-    if (uart_iost() & READ_READY) {
+       gdb_recv() inside the INT3 handler to consume.  Also bail out if IO abort
+       is set by an ISR (timer, etc). */
+    if ((io_abort_test()) || (uart_iost() & _READ_READY)) {
         gdb_active = 1;
         gdb_from_poll = 1;       /* tell gdb_handler: don't adjust EIP */
         __asm__ volatile("int $3");
