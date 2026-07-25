@@ -335,7 +335,7 @@ void gdb_poll(void) {
     /* Check UART read readiness — do NOT read RBR here.  The byte must remain for
        gdb_recv() inside the INT3 handler to consume.  If we read it now,
        gdb_recv will block forever waiting for the $ start-of-packet. */
-    if (uart_peak() & READ_READY) {
+    if (uart_iost() & READ_READY) {
         gdb_active = 1;
         gdb_from_poll = 1;       /* tell gdb_handler: don't adjust EIP */
         __asm__ volatile("int $3");

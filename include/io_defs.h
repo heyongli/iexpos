@@ -5,7 +5,7 @@
 #define BIT(n)          (1U << (n))
 
 /* standard IO semantics — function return value bitmask conventions
-   used by uart_peak() and any poll-style IO function */
+   used by uart_iost() and any poll-style IO function */
 #define READ_READY      BIT(0)    /* data available for read (RBR has data) */
 #define WRITE_READY     BIT(1)    /* transmitter holding register empty, ready for write */
 

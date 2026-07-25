@@ -5,10 +5,10 @@
     It cannot be used on other architectures without porting.
 
     Architecture:
-    uart_peak() is the sole hardware poll primitive — it reads LSR
+    uart_iost() is the sole hardware poll primitive — it reads LSR
     and returns a READ_READY|WRITE_READY bitmask using standard IO
     semantics defined in io_defs.h. All other UART functions are
-    composed on top of uart_peak().
+    composed on top of uart_iost().
 
     Hardware:
     - UART base address: 0x3F8 (COM1)
@@ -23,23 +23,23 @@
     - Bit 6: TRANSMITTER EMPTY (1 = all sent)
 */
 
-void uart_peak_write(unsigned char c) {
+void uart_iost_write(unsigned char c) {
     /* Non-blocking write: write only if THR is empty.
        Returns without writing if UART is not ready. */
-    if (uart_peak() & WRITE_READY) {
+    if (uart_iost() & WRITE_READY) {
         __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
     }
 }
 
 void uart_poll_write(unsigned char c) {
     /* Blocking write: poll until THR is empty, then write. */
-    while (!(uart_peak() & WRITE_READY)) {}
+    while (!(uart_iost() & WRITE_READY)) {}
     __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
 }
 
 unsigned char uart_poll_in(void) {
     /* Blocking poll read: poll until DATA READY, then read RBR. */
-    while (!(uart_peak() & READ_READY)) {}
+    while (!(uart_iost() & READ_READY)) {}
     unsigned char c;
     __asm__ volatile("inb %1, %0" : "=a"(c) : "Nd"(COM1));
     return c;
@@ -52,7 +52,7 @@ void uart_init(void) {
     __asm__ volatile("outb %0, %1" : : "a"((unsigned char)0), "Nd"((unsigned short)COM1_MCR));
 }
 
-int uart_peak(void) {
+int uart_iost(void) {
     /* The sole hardware poll primitive — reads LSR and returns
        a bitmask using standard IO semantics (READ_READY, WRITE_READY)
        defined in io_defs.h. All other UART functions compose on this. */
