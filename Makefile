@@ -8,7 +8,7 @@ LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
-        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o
+        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/progress.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
@@ -33,9 +33,6 @@ $(BDIR)/uart.o: bmX86/uart.c bmX86/include/uart.h | $(BDIR)
 $(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/io.o: io.c include/io.h | $(BDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
 $(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h gdb-stub/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -57,7 +54,10 @@ $(BDIR)/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h 
 $(BDIR)/ui.o: ui/ui.c ui/ui.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/orbit.o: ui/demos/orbit.c ui/demos/demo.h kernel/include/baremetal.h ui/ui.h | $(BDIR)
+$(BDIR)/orbit.o: ui/demos/orbit.c ui/demos/demo.h kernel/include/baremetal.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/progress.o: ui/demos/demo_progress.c ui/demos/demo.h ui/ui.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/kernel.bin: $(OBJS)

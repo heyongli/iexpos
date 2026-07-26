@@ -5,15 +5,22 @@
 #include "io.h"
 
 static struct fb_info fb;
-static volatile unsigned char *fb_mem;
-static volatile unsigned char *real_fb;
-static int fb_size;
-static int flip_active;
+static volatile unsigned char *fb_mem;   /* current draw target (back buffer) */
+static volatile unsigned char *real_fb;  /* VGA framebuffer base (PCI BAR0) */
+static int fb_size;                      /* bytes per buffer = width*height*bpp/8 */
+
+/* Back-buffer in main RAM — writing to VGA memory triggers QEMU dirty-page
+ * tracking and can cause display artefacts even though YOFF hides the page.
+ * We draw here and bulk-copy to real_fb only in fb_swap().
+ * NOTE: must live above the VGA legacy hole (0xA0000-0xBFFFF) so we
+ * allocate from extended memory at boot time instead of using BSS. */
+static volatile unsigned char *draw_buf;
 
 #define VBE_VW    6
 #define VBE_YOFF  9
 
 static void putpixel(int x, int y, unsigned int color);
+static void fill_rect(int x, int y, int w, int h, unsigned int color);
 static void draw_char(int x, int y, char c, unsigned int color);
 
 /* ---- screen backend (25×80 grid for console) ---- */
@@ -65,8 +72,10 @@ static void scr_be_flush(void) {
         int yy = 2 + i * FONT_HEIGHT;
         if (yy + FONT_HEIGHT > fb.height)
             break;
-        for (j = 0; j < SCR_COLS && scr_grid[i][j]; j++)
-            draw_char(2 + j * FONT_WIDTH, yy, scr_grid[i][j], 0xFFFFFF);
+        for (j = 0; j < SCR_COLS; j++) {
+            if (scr_grid[i][j])
+                draw_char(2 + j * FONT_WIDTH, yy, scr_grid[i][j], 0xFFFFFF);
+        }
     }
 }
 
@@ -262,7 +271,20 @@ static void fill_rect(int x, int y, int w, int h, unsigned int color) {
 }
 
 static void clear(unsigned int color) {
-    fill_rect(0, 0, fb.width, fb.height, color);
+    if (fb.bpp == 32) {
+        unsigned int n = fb.width * fb.height;
+        __asm__ volatile(
+            "cld\n\trep stosl\n"
+            : : "a"(color), "D"(fb_mem), "c"(n)
+            : "memory"
+        );
+    } else {
+        __asm__ volatile(
+            "cld\n\trep stosb\n"
+            : : "a"((unsigned char)color), "D"(fb_mem), "c"(fb_size)
+            : "memory"
+        );
+    }
 }
 
 static void init(void) {
@@ -280,9 +302,11 @@ static void init(void) {
         fb.addr   = 0xA0000;
     }
     fb_size = fb.width * fb.height * (fb.bpp / 8);
-    real_fb = (volatile unsigned char *)fb.addr;
-    flip_active = 0;
-    fb_mem = (fb.bpp == 32) ? (real_fb + fb_size) : real_fb;
+    real_fb = (volatile unsigned char *)fb.addr;   /* base of VGA framebuffer */
+    /* Allocate back-buffer from extended memory (above 1 MB) to avoid
+     * the VGA legacy hole at 0xA0000-0xBFFFF that corrupts writes. */
+    draw_buf = (volatile unsigned char *)0x100000;
+    fb_mem = draw_buf;
     {
         struct fb_info *h = (struct fb_info *)0x600;
         h->width  = fb.width;
@@ -336,27 +360,17 @@ int  bm_ui_width(void) { return fb.width; }
 int  bm_ui_height(void) { return fb.height; }
 int  bm_ui_bpp(void) { return fb.bpp; }
 
-void bm_swap(void) {
+/* Swap: copy the main-RAM draw buffer into VGA framebuffer in one shot.
+ * No YOFF flips — the display always scans out from real_fb.
+ * Single bulk memcpy minimises QEMU dirty-page tracking artefacts. */
+void fb_swap(void) {
     if (!real_fb) return;
-    if (fb.bpp == 32) {
-        volatile unsigned char *new_front = fb_mem;
-        flip_active ^= 1;
-        vbe_write_reg(VBE_YOFF, flip_active ? fb.height : 0);
-        volatile unsigned char *new_back = real_fb + (flip_active ? 0 : fb_size);
-        __asm__ volatile(
-            "cld\n\trep movsb\n"
-            : : "S"(new_front), "D"(new_back), "c"(fb_size)
-            : "memory"
-        );
-        fb_mem = new_back;
-    } else {
-        unsigned int n = fb_size;
-        void *src = (void *)fb_mem;
-        void *dst = (void *)real_fb;
-        __asm__ volatile(
-            "cld\n\trep movsb\n"
-            : : "S"(src), "D"(dst), "c"(n)
-            : "memory"
-        );
-    }
+    unsigned int n = fb_size / 4;
+    void *src = (void *)draw_buf;
+    void *dst = (void *)real_fb;
+    __asm__ volatile(
+        "cld\n\trep movsl\n"
+        : : "S"(src), "D"(dst), "c"(n)
+        : "memory"
+    );
 }

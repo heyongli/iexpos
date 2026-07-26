@@ -1,6 +1,5 @@
 #include "demo.h"
 #include "baremetal.h"
-#include "ui.h"
 
 static const int cos_tab[256] = {
   256,  255,  255,  255,  254,  254,  253,  252,
@@ -71,39 +70,23 @@ static const int sin_tab[256] = {
   -49,  -43,  -37,  -31,  -25,  -18,  -12,  -6,
 };
 
-static int phase;
+static int frame;
 
 int demo_orbit(void) {
-    int i, p;
+    int i;
     unsigned int cols[4] = {0x60a5fa, 0x34d399, 0xf472b6, 0xfbbf24};
     int off[8] = { -52, -52, 52, -52, -52, 52, 52, 52 };
     int cx = 512, cy = 360, sq = 96;
 
-    if (phase == 0) {
-        unsigned char h, m, s0;
-        bm_rtc_read(&h, &m, &s0);
-        for (i = 0; i < 4; i++)
-            bm_ui_fill_rect(cx + off[i*2] - sq / 2, cy + off[i*2+1] - sq / 2, sq, sq, cols[i]);
-        bm_swap();
-        progress_init();
-        phase = 1;
-        return 0;
+    if (frame == 0) {
+        frame = 1;
     }
-    p = phase;
-    bm_ui_clear(0x0f1729);
-    bm_flush();
     for (i = 0; i < 4; i++) {
-        int a = p * 3;
+        int a = frame * 3;
         int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
         int ry = (off[i*2] * sin_tab[a & 255] + off[i*2+1] * cos_tab[a & 255]) / 256;
         bm_ui_fill_rect(cx + rx - sq / 2, cy + ry - sq / 2, sq, sq, cols[i]);
     }
-    progress_set(p);
-    phase++;
-    if (p >= 100) {
-        progress_text("done");
-        phase = 0;
-        return 1;
-    }
+    frame++;
     return 0;
 }

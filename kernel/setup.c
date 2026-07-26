@@ -5,8 +5,6 @@
 static void write_dec(int val);
 
 void setup_main(void) {
-    int demo_done = 0;
-
     bm_puts("entry\n");
     bm_init();
     bm_puts("vga init done\n");
@@ -30,16 +28,13 @@ void setup_main(void) {
 
     bm_ui_clear(0x0f1729);
     bm_flush();
-    bm_swap();
+    fb_swap();
 
     bm_puts("gdb stub done\n");
 
     while (1) {
-        if (!demo_done) {
-            demo_done = demo_orbit();
-            if (demo_done)
-                bm_puts("Graphics test complete\n");
-        }
+        demo_draw();
+        fb_swap();
         gdb_poll();
     }
 }

@@ -11,6 +11,12 @@ make -C $DIR clean all 2>&1 | tail -5
 
 echo ""
 echo "============================================"
+echo "  Running: kernel memory layout tests"
+echo "============================================"
+tests/check_bss.sh
+
+echo ""
+echo "============================================"
 echo "  Running: serial output tests"
 echo "============================================"
 tests/serial.sh --no-build

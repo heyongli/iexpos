@@ -53,6 +53,18 @@ For VBE mode the values come from the mode‑info block at `ES:DI+0x12`,
 `+0x14`, `+0x19` and `+0x28`. For VGA 13h they are hard‑coded to
 `320 × 200, 8 bpp, 0xA0000`.
 
+### GOTCHA: writing to 0x5FC corrupts INT 13h
+
+Address 0x5FC lies inside the BIOS Data Area (0x400–0x5FF). Writing a flag
+byte there (e.g. to signal VBE availability to C code) causes `INT 0x13`
+disk reads to behave incorrectly — the BIOS uses BDA memory during INT 13h
+and reads back the corrupted flag.
+
+**Fix:** do not write to 0x400–0x5FF. Communicate VBE status by checking
+`fb.addr` in the kernel: if it equals `0xA0000` the mode is legacy VGA 13h;
+otherwise VBE mode was set and the raw mode‑info block at `0x10000` can be
+parsed.
+
 ### 4. Load Kernel from Disk
 
 Uses `INT 0x13` extended read (`AH=0x42`) with a Disk Address Packet (DAP):
@@ -110,7 +122,24 @@ the kernel at `0x7E00`.
 | gdt_end    | —      | (label only)            |
 | gdt_desc   | 0xD8   | limit=23, base=0x7CC0   |
 
-Each descriptor uses explicit `dw`/`db` directives — see **DESIGN.md §1**.
+### GOTCHA: GDT descriptor byte ordering
+
+NASM's `dw` with multiple operands packs them as consecutive 16‑bit words,
+not byte‑by‑byte. The GDT spec requires a mix of `dw` (limit low, base low)
+and `db` (base mid, access, flags+limit high, base high):
+
+```asm
+;; WRONG — all dw packs as words, corrupting the descriptor
+gdt_code:  dw 0xffff, 0x0000, 0x00, 0x9a, 0xcf, 0x00
+
+;; RIGHT — explicit dw/db matches the byte-level layout
+gdt_code:  dw 0xffff
+           dw 0x0000
+           db 0x00
+           db 0x9a
+           db 0xcf
+           db 0x00
+```
 
 ## Memory Layout
 

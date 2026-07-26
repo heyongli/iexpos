@@ -15,7 +15,7 @@ static char cur_txt[32];
 
 static void draw_bar(void) {
     int pad = 4, fw = bw - pad * 2, fh = BAR_H - pad * 2;
-    bm_ui_fill_rect(bx + pad, by + pad, fw, fh, BAR_C);
+    bm_ui_fill_rect(bx, by, bw, BAR_H, BAR_C);
     int fill = (fw * cur_pct) / 100;
     if (fill > 0) {
         bm_ui_fill_rect(bx + pad, by + pad, fill, fh / 2, 0x94a3b8);
@@ -44,7 +44,6 @@ static void draw_bar(void) {
         for (i = 0; i < len; i++)
             bm_ui_draw_char_sz(bx + 4 + i * cw, ty, cur_txt[i], INF_C, tsz);
     }
-    bm_swap();
 }
 
 void progress_init(void) {

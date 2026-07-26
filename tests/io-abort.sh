@@ -15,7 +15,7 @@ make -C $DIR clean all 2>&1 | tail -3
 echo ""
 echo "=== Booting VM (io abort test) ==="
 timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
-    -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT 2>/dev/null
+    -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT -monitor none 2>/dev/null || true
 
 echo ""
 echo "=== Verifying IO abort ==="

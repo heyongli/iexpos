@@ -10,8 +10,16 @@ then halts in an infinite loop.
 
 The kernel binary is loaded by the bootloader to `0x7E00`. The bootloader
 jumps to `0x7E00`, which must be the **first function** in the binary.
-`kernel_main` is placed first in the source file to guarantee this — see
-DESIGN.md §4.
+`kernel_main` is placed first in the source file to guarantee this.
+
+### GOTCHA: compiler reorders functions
+
+Adding helper functions before `kernel_main` caused the compiler to place
+them first in `.text`. The bootloader's jump to `0x7E00` landed in the
+middle of a helper, producing a triple‑fault → CPU reset.
+
+**Fix:** keep `kernel_main` as the first function in the source file, with
+forward declarations for any helpers.
 
 ## Serial Debug Output
 

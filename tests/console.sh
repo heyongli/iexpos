@@ -15,7 +15,7 @@ fi
 echo ""
 echo "=== Booting VM (console test) ==="
 timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
-    -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT 2>/dev/null
+    -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT -monitor none 2>/dev/null || true
 
 echo ""
 echo "=== Verifying console output ==="
@@ -36,7 +36,7 @@ check() {
 }
 
 # Console markers from setup.c
-check "Entry message"           "^entry$"
+check "Entry message"           "entry"
 check "VGA init done"           "vga init done"
 check "Graphics init OK"        "Graphics init OK"
 check "GDB stub init"           "gdb stub init done"

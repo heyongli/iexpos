@@ -1,49 +1,29 @@
 # iexpos — Project Documentation & Workflow Guide
 
 > This file is the project index, **no need to load all content at once**.
-> 
+> **Always read `design.md` first** — it contains the x86 memory map, known gotchas, and the project's design decisions. This overrides principle #1 for this one file.
 > Working Principles:
-> 1. Files should first be described in one sentence about their role, then Read specific content; don't preload all context
-> 2. When modifying a module, find the corresponding file based on the index below and Read it, don't load unrelated files at the same time
+> 1. load `design.md`
+> 2. When modifying a module, Read its source file(s) directly, don't load unrelated files at the same time
 > 3. Only read files needed for the current task, stop when done
 
-## File Index
 
-> **External reference documents are for reference only, load as context only when needed, don't read in advance.**
+## Doc per Module
 
-- boot/boot.asm - Boot loader loads kernel
-- boot/entry.asm - GDT+CR0, jump to setup_main
+Each module's design decisions, gotchas, and debug history belong in that
+module's own doc file (`docs/<module>.md`). `design.md` only contains
+cross-cutting concerns (memory map, architecture overview). Don't put
+module-specific content in `design.md`.
 
-- kernel/setup.c - Entry, bm_init, print, run demo
-- kernel/console.c/h - Ring buffer, backend dispatch
-- include/baremetal.h - Unified platform API
-- include/font_8x16.h - Font
+## work flow
 
-- bmX86/vga.c/h - VGA driver
-- bmX86/rtc.c/h - RTC driver
-- include/vbe.h - VBE struct
+- After modifying source files, run `make clean all` to verify compilation, then run the **module-specific test** (e.g. `tests/vga.sh` for VGA, `tests/serial.sh` for serial). Only if asked to commit, run `./test.sh` to execute all tests and fix any failures found.
+- change code should update related docs
+-  Build & Test , do make clean all and rebuild test for any change
+-  run specific test for code changes
+-  run all test cases before commit code
 
-- ui/ui.c/h - Progress bar
 
-- demos/demos.h - Demo entry
-- demos/orbit.c - Rotation animation
-
-- tests/serial.sh - Serial test
-- tests/visual.sh - Visual test
-- tests/gdb-qemu.sh - QEMU single step trace
-- docs/gdb-qemu.md - QEMU GDB documentation
-- docs/gdb-serial.md - GDB stub implementation
-- docs/serial.md - Serial port design
-- docs/io-ports.md - I/O port reference
-
-## Build & Test
-
-```bash
-make clean all           # Build (output in build/)
-./test.sh                # Run all tests
-tests/serial.sh          # Run serial test alone
-tests/visual.sh          # Run visual test alone
-```
 
 ## Key Conventions
 
@@ -53,7 +33,7 @@ tests/visual.sh          # Run visual test alone
 - Linker: `ld -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n`
 - No standard library, stack: `mov esp, 0x7C00`
 - kernel.bin first 4 bytes is entry.asm (linked first)
-- Kernel load address: 0x7E00, BSS uses `-n` to avoid hitting 0xA0000
+- Kernel load address: 0x7E00, BSS uses `-n` to avoid hitting 0xA0000, but `-n` alone is insufficient when a single BSS array exceeds ~640 KB (spans into VGA hole 0xA0000–0xBFFFF). Large buffers must be pointers allocated from extended memory (≥ 0x100000).
 
 GDB (QEMU) debugging details: `docs/gdb-qemu.md`
 Debug serial port markers: `docs/serial.md`

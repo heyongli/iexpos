@@ -1,118 +1,118 @@
-# Design & Debug Journal
+# Design & Debug
 
-## Architecture Overview
+> This document records **high-level design decisions** that affect the
+> project as a whole. Module-specific implementation details, debug flows,
+> and problem analysis belong in `docs/<module>.md`.
 
-```
-┌──────────────┐
-│   BIOS       │  loads boot sector → 0x7C00
-└──────┬───────┘
-       │
-┌──────▼───────┐
-│  boot.asm    │  (16‑bit) set graphics mode,
-│              │  read kernel via INT 13h LBA,
-│              │  load GDT, switch to PM
-└──────┬───────┘
-       │
-┌──────▼───────┐
-│  kernel.c    │  (32‑bit) init VGA driver,
-│  vga.c       │  print to COM1 serial,
-│              │  draw rectangles
-└──────────────┘
-```
+## Overall Design Decisions
 
-### Data flow — framebuffer info
+### Why bare metal?
 
-```
-boot.asm                        kernel / vga.c
-─────────                       ─────────────
-INT 0x10 → VBE mode info        reads struct from 0x600
-     │                                │
-     └──→ copy width, height,         │
-          bpp, fb_addr to 0x600  ─────┘
-                               also 0x10000 raw VBE block
-```
+Learning project. No OS, no libc, no runtime — everything from scratch.
+This drives every other decision below.
 
----
+### Toolchain
 
-## Gotchas & Fixes
+- **GCC `-m32 -ffreestanding -fno-PIC -nostdlib`** — freestanding, no libc
+  dependencies, position-dependent code for a fixed load address.
+- **NASM `-f bin`** for boot sector (no ELF overhead, must be 512 bytes),
+  **NASM `-f elf32`** for 32-bit entry code linked into the kernel.
+- **LD `-Ttext 0x7E00 -e entry --oformat binary -n`** — raw binary at fixed
+  address, no ELF loader needed. `-n` disables page alignment to keep BSS
+  below 0xA0000 (though insufficient for large arrays — see Memory Map
+  Consistency principle).
 
-### 1. GDT descriptor byte ordering (NASM)
+### Boot strategy
 
-**Problem:** The GDT code segment descriptor was incorrectly assembled because
-every field was declared with `dw` (16 bits), while the spec requires a mix of
-`dw` (16‑bit limit low, base low), `db` (base mid, access, flags+limit high,
-base high).
+Two-stage: **BIOS → bootloader (512 bytes) → kernel**.
+
+- Stage 1 (`boot.asm`): real-mode, sets VBE graphics, loads kernel from
+  disk via INT 13h LBA, switches to protected mode.
+- Stage 2 (`entry.asm`): sets up GDT / segment registers / stack, jumps to
+  C.
+- Kernel (`setup.c + modules`): all C code, linked as a flat binary at
+  0x7E00 overwriting the bootloader.
+
+This split keeps the 512-byte boot sector simple (only mode set + disk I/O)
+while keeping kernel development in C.
 
 ```
-;; WRONG — all dw
-gdt_code:  dw 0xffff, 0x0000, 0x00, 0x9a, 0xcf, 0x00
-
-;; RIGHT — explicit dw/db
-gdt_code:  dw 0xffff
-           dw 0x0000
-           db 0x00
-           db 0x9a
-           db 0xcf
-           db 0x00
+BIOS → boot.asm (16-bit, VBE + disk) → entry.asm (PM switch) → kernel C
 ```
 
-NASM's `dw` with multiple operands packs them as consecutive 16‑bit words,
-not byte‑by‑byte, corrupting the descriptor.
+### Debug strategy
 
-### 2. BSS section placed into VGA memory
+- **Serial port (COM1, 0x3F8)** as the primary debug output channel —
+  works from real mode through protected mode, no framebuffer needed.
+- **QEMU + KVM** as the primary test target — fast, reproducible, supports
+  screendump, monitor, GDB stub.
+- **GDB over serial** (`docs/gdb-serial.md`) for interactive debugging.
+- **No hardware testing** — all development on QEMU.
 
-**Problem:** The kernel's BSS (uninitialised static variables) landed at
-address ~0xA0000, overlapping the VGA framebuffer. This caused the kernel's
-`fb` struct to be silently corrupted the moment any rect was drawn.
+### Memory model
 
-**Root cause:** The linker by default aligns sections to page boundaries (4K).
-With `.text` at 0x7E00, `.bss` was rounded up to the next 4K page boundary at
-0xA0000.
+- **Flat 32-bit protected mode** — no paging, no segmentation (base 0,
+  limit 4 GiB for both code and data).
+- **Single binary** — kernel is position-dependent, loaded at 0x7E00.
+- **Stack at 0x7C00** (grows down, 4 KiB below boot sector).
+- **Physical memory map** must be checked manually — no MMU to remap
+  around the VGA hole. See Core Principle below.
+- **All structures are packed** (`__attribute__((packed))`) to match
+  hardware/VBE layouts.
 
-**Fix:** Added `-n` (or `-N`) to the linker flags —
-`ld -m elf_i386 -Ttext 0x7E00 -n …`. This disables page alignment and places
-BSS immediately after `.rodata`.
+### IO Abort
 
-### 3. Writing to 0x5FC corrupted INT 13h
+Busy-waiting loops (UART polling, GDB stub) need a way to be interrupted.
+The IO abort provides a **per-CPU flag** that any loop can check, and any
+other CPU or interrupt handler can set. Implementation details in
+`docs/io-abort.md`.
 
-**Problem:** Writing a flag byte to `[0x5FC]` (intended to communicate VBE
-availability to the C code) caused the subsequent `INT 0x13` disk read to
-behave incorrectly or to read corrupt data, resulting in a kernel crash.
+### UI / VGA / Framebuffer
 
-**Root cause:** Address 0x5FC lies inside the BIOS Data Area (0x400–0x5FF) and
-is used internally by the BIOS during INT 13h operations.
+Double-buffered rendering with a single software backbuffer:
 
-**Fix:** Removed the 0x5FC writes. The kernel now detects VBE availability by
-checking `fb.addr`: if it equals `0xA0000`, the mode is legacy VGA 13h;
-otherwise VBE mode was set and the raw mode‑info block at 0x10000 can be
-parsed.
+```
+console (text) ──┐
+UI (progress)  ──┤
+demos (orbit)  ──┤
+                 ▼
+          draw_buf (backbuffer, extended memory)
+                 │
+          bm_flush (dirty-row memcpy)
+                 ▼
+          fb_mem (VBE linear framebuffer, PCI MMIO)
+```
 
-### 4. Kernel entry point at 0x7E00
+Design decisions in `docs/vga-driver.md`.
 
-**Problem:** The bootloader jumps to `0x7E00`, which was assumed to be
-`kernel_main`. After adding helper functions (`serial_print`,
-`serial_print_dec`) to `kernel.c`, the compiler placed them **before**
-`kernel_main` in the `.text` section. The jump landed in the middle of a
-helper function, causing a triple‑fault → CPU reset.
+## Key Implementation Details
 
-**Fix:** Placed `kernel_main` first in the source file, with forward
-declarations for the helper functions. This ensures the first byte of the
-kernel binary is always the entry point.
+### Memory Map Consistency
 
-### 5. VBE mode 0x4118 bpp
+Every static data region (BSS, stack, heap, framebuffer backbuffer) must be
+**explicitly verified** against the x86 physical memory map. The linker has no
+knowledge of platform MMIO regions — it places sections purely by its built-in
+defaults. This has caused multiple bugs in this project.
 
-**Problem:** Mode 0x4118 (VESA defined as 1024×768×32) was reported by QEMU's
-VBE as **24 bpp** (bits per pixel), not 32. The original driver assumed `bpp
-/ 8 = 4` and wrote a 4th byte (alpha) unconditionally, potentially corrupting
-adjacent pixels.
+#### x86 Physical Memory Map (lower 4 GiB)
 
-**Fix:** Made putpixel conditionally write the 4th byte only when
-`fb.bpp >= 32`. The driver now works with both 24‑bpp and 32‑bpp modes.
+| Start    | End      | Region                 | Note                        |
+|----------|----------|------------------------|-----------------------------|
+| 0x000000 | 0x0005FF | IVT / BDA              | Do not write                |
+| 0x000600 | 0x0006FF | fb_info (bootloader)   | Reserved for boot data      |
+| 0x007C00 | 0x007DFF | Bootloader             | Overwritten by kernel       |
+| 0x007E00 | …        | Kernel (.text,.data,.bss)| Raw binary loaded by BIOS |
+| 0x080000 | 0x09FFFF | Conventional RAM       | Stack, small allocations    |
+| **0xA0000** | **0xBFFFF** | **VGA legacy hole** | **VGA video memory — writes go to display, not RAM** |
+| 0xC0000  | 0xFFFFF  | Video ROM / BIOS       | ROM shadowing               |
+| 0x100000 | …        | Extended memory        | Safe for large allocations  |
 
-### 6. Triple‑fault on KVM without sg
+#### Verification
 
-**Problem:** Running QEMU without `sg kvm -c "…"` would sometimes fail to
-access KVM permissions.
-
-**Fix:** The Makefile and test scripts wrap QEMU invocations with
-`sg kvm -c "…"` to switch to the kvm group.
+- Memory map consistency enforced by `tests/check_bss.sh` — run after any
+  change to BSS layout.
+- Large buffers (framebuffer backbuffers, ≥ 64 KB) must be allocated from
+  extended memory (≥ 0x100000), not from BSS.
+- Manual check: `nm -n kernel.elf | tail -20` to verify BSS end < 0xA0000.
+- For any new static buffer ≥ 64 KB, compute `&buf + sizeof(buf)` and confirm
+  it does not intersect 0xA0000–0xBFFFF.

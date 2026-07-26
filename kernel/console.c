@@ -77,3 +77,4 @@ void console_flush(void) {
 
 void bm_puts(const char *s) { console_write(s); }
 void bm_flush(void) { console_flush(); }
+

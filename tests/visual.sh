@@ -58,15 +58,14 @@ fi
 
 echo "  Screendump: $(wc -c < $SCR) bytes"
 
-# Check the PPM has non-background pixels
-# Skip PPM header (3 lines), sample bytes at offset 100
-SAMPLE=$(dd if="$SCR" bs=1 skip=100 count=200 2>/dev/null | od -An -tu1 | awk '{for(i=1;i<=NF;i++) s+=$1} END {print s}')
-if [ -z "$SAMPLE" ] || [ "$SAMPLE" -eq 0 ]; then
-  echo "  FAIL: framebuffer appears all black (sample=$SAMPLE)"
+# Check screendump with the pixel-analysis test script
+echo "  Checking screendump..."
+if python3 $DIR/tests/check_screendump.py "$SCR"; then
+  echo "  PASS: all pixel checks passed"
+  rm -f $SER
+  echo ""
+  echo "=== VISUAL TEST PASSED ==="
+else
+  echo "  FAIL: screendump pixel checks failed"
   rm -f $SER; exit 1
 fi
-
-echo "  PASS: framebuffer has visible content (pixel sum = $SAMPLE)"
-rm -f $SER
-echo ""
-echo "=== VISUAL TEST PASSED ==="
