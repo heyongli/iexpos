@@ -1,10 +1,12 @@
 #include "baremetal.h"
-#include "demos/demos.h"
+#include "demo.h"
 #include "gdb_stub.h"
 
 static void write_dec(int val);
 
 void setup_main(void) {
+    int demo_done = 0;
+
     bm_puts("entry\n");
     bm_init();
     bm_puts("vga init done\n");
@@ -32,12 +34,14 @@ void setup_main(void) {
 
     bm_puts("gdb stub done\n");
 
-    demo_orbit();
-
-    bm_puts("Graphics test complete\n");
-
-    while (1)
+    while (1) {
+        if (!demo_done) {
+            demo_done = demo_orbit();
+            if (demo_done)
+                bm_puts("Graphics test complete\n");
+        }
         gdb_poll();
+    }
 }
 
 static void write_dec(int val) {

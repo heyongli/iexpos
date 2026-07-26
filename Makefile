@@ -1,7 +1,7 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I demos -I kernel -I kernel/include -I gdb-stub
+CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I ui/demos -I kernel -I kernel/include -I gdb-stub
 CFLAGS_DEBUG = $(CFLAGS) -DDEBUG
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
 LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
@@ -36,7 +36,7 @@ $(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
 $(BDIR)/io.o: io.c include/io.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h gdb-stub/gdb_stub.h | $(BDIR)
+$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h gdb-stub/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/gdb_stub.o: gdb-stub/gdb_stub.c gdb-stub/gdb_stub.h | $(BDIR)
@@ -57,7 +57,7 @@ $(BDIR)/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h 
 $(BDIR)/ui.o: ui/ui.c ui/ui.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/orbit.o: demos/orbit.c demos/demos.h kernel/include/baremetal.h ui/ui.h | $(BDIR)
+$(BDIR)/orbit.o: ui/demos/orbit.c ui/demos/demo.h kernel/include/baremetal.h ui/ui.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/kernel.bin: $(OBJS)

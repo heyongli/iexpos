@@ -1,4 +1,4 @@
-#include "demos.h"
+#include "demo.h"
 #include "baremetal.h"
 #include "ui.h"
 
@@ -51,7 +51,7 @@ static const int sin_tab[256] = {
   212,  209,  205,  201,  197,  193,  189,  185,
   181,  176,  171,  167,  162,  157,  152,  147,
   142,  136,  131,  126,  120,  115,  109,  103,
-  97,   92,   86,   80,   74,   68,   62,   56,
+  97,   92,   86,   80,   74,   68,   62,  56,
   49,   43,   37,   31,   25,   18,   12,   6,
   0,   -6,  -12,  -18,  -25,  -31,  -37,  -43,
   -49,  -56,  -62,  -68,  -74,  -80,  -86,  -92,
@@ -71,35 +71,39 @@ static const int sin_tab[256] = {
   -49,  -43,  -37,  -31,  -25,  -18,  -12,  -6,
 };
 
-void demo_orbit(void) {
-    int i;
+static int phase;
+
+int demo_orbit(void) {
+    int i, p;
     unsigned int cols[4] = {0x60a5fa, 0x34d399, 0xf472b6, 0xfbbf24};
     int off[8] = { -52, -52, 52, -52, -52, 52, 52, 52 };
     int cx = 512, cy = 360, sq = 96;
-    unsigned char h, m, s0;
 
-    bm_rtc_read(&h, &m, &s0);
-    for (i = 0; i < 4; i++)
-        bm_ui_fill_rect(cx + off[i*2] - sq / 2, cy + off[i*2+1] - sq / 2, sq, sq, cols[i]);
-    bm_swap();
-    progress_init();
-    {
-        int p;
-        for (p = 1; p <= 100; p++) {
-            bm_ui_clear(0x0f1729);
-            bm_flush();
-            for (i = 0; i < 4; i++) {
-                int a = p * 3;
-                int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
-                int ry = (off[i*2] * sin_tab[a & 255] + off[i*2+1] * cos_tab[a & 255]) / 256;
-                bm_ui_fill_rect(cx + rx - sq / 2, cy + ry - sq / 2, sq, sq, cols[i]);
-            }
-            progress_set(p);
-            {
-                volatile int d;
-                for (d = 0; d < 25000000; d++);
-            }
-        }
-        progress_text("done");
+    if (phase == 0) {
+        unsigned char h, m, s0;
+        bm_rtc_read(&h, &m, &s0);
+        for (i = 0; i < 4; i++)
+            bm_ui_fill_rect(cx + off[i*2] - sq / 2, cy + off[i*2+1] - sq / 2, sq, sq, cols[i]);
+        bm_swap();
+        progress_init();
+        phase = 1;
+        return 0;
     }
+    p = phase;
+    bm_ui_clear(0x0f1729);
+    bm_flush();
+    for (i = 0; i < 4; i++) {
+        int a = p * 3;
+        int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
+        int ry = (off[i*2] * sin_tab[a & 255] + off[i*2+1] * cos_tab[a & 255]) / 256;
+        bm_ui_fill_rect(cx + rx - sq / 2, cy + ry - sq / 2, sq, sq, cols[i]);
+    }
+    progress_set(p);
+    phase++;
+    if (p >= 100) {
+        progress_text("done");
+        phase = 0;
+        return 1;
+    }
+    return 0;
 }
