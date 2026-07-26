@@ -3,20 +3,21 @@
 #include "console.h"
 #include "baremetal.h"
 #include "io.h"
+#include "include/os_regs.h"
 
 static struct fb_info fb;
 static volatile unsigned char *fb_mem;   /* current draw target (back buffer) */
 static volatile unsigned char *real_fb;  /* VGA framebuffer base (PCI BAR0) */
 static int fb_size;                      /* bytes per buffer = width*height*bpp/8 */
 
-/* Back-buffer in main RAM — writing to VGA memory triggers QEMU dirty-page
- * tracking and can cause display artefacts even though YOFF hides the page.
- * We draw here and bulk-copy to real_fb only in fb_swap().
- * NOTE: must live above the VGA legacy hole (0xA0000-0xBFFFF) so we
- * allocate from extended memory at boot time instead of using BSS. */
+/* Back-buffer in main RAM, must live above the VGA legacy hole
+ * (0xA0000-0xBFFFF) so allocated from extended memory at boot time
+ * instead of BSS. */
 static volatile unsigned char *draw_buf;
 
 #define VBE_VW    6
+#define VBE_VH    7
+#define VBE_XOFF  8
 #define VBE_YOFF  9
 
 static void putpixel(int x, int y, unsigned int color);
@@ -192,6 +193,7 @@ static int vbe_try_init(void) {
     vbe_write_reg(VBE_YRES, 768);
     vbe_write_reg(VBE_BPP, 32);
     vbe_write_reg(VBE_VW, 1024);
+    vbe_write_reg(VBE_XOFF, 0);
     vbe_write_reg(VBE_YOFF, 0);
     vbe_write_reg(VBE_ENABLE, VBE_ENABLED | VBE_LFB_ENABLED);
     return _IO_OK;
@@ -288,33 +290,64 @@ static void clear(unsigned int color) {
 }
 
 static void init(void) {
-    unsigned int bar0 = pci_find_vga_bar0();
-    if (bar0 && vbe_try_init() == _IO_OK) {
-        fb.width  = 1024;
-        fb.height = 768;
-        fb.bpp    = 32;
-        fb.addr   = bar0;
+    /* Step 1: read fb_info written by bootloader at 0x600.
+     * Bootloader wrote this via INT 0x10 VBE (or hardcoded for VGA 13h).
+     * If addr != 0xA0000, VBE mode was set in real mode — keep it. */
+    struct fb_info *bi = (struct fb_info *)0x600;
+    int boot_vbe = (bi->addr != 0 && bi->addr != 0xA0000);
+    const char *mode_str;
+
+    if (boot_vbe) {
+        fb.width  = bi->width;
+        fb.height = bi->height;
+        fb.bpp    = bi->bpp;
+        fb.addr   = bi->addr;
+        mode_str = "boot VBE";
     } else {
-        vga_set_mode13();
-        fb.width  = 320;
-        fb.height = 200;
-        fb.bpp    = 8;
-        fb.addr   = 0xA0000;
+        unsigned int bar0 = pci_find_vga_bar0();
+        if (bar0 && vbe_try_init() == _IO_OK) {
+            fb.width  = 1024;
+            fb.height = 768;
+            fb.bpp    = 32;
+            fb.addr   = bar0;
+            mode_str = "Bochs VBE";
+        } else {
+            vga_set_mode13();
+            fb.width  = 320;
+            fb.height = 200;
+            fb.bpp    = 8;
+            fb.addr   = 0xA0000;
+            mode_str = "VGA 13h";
+        }
     }
+
     fb_size = fb.width * fb.height * (fb.bpp / 8);
-    real_fb = (volatile unsigned char *)fb.addr;   /* base of VGA framebuffer */
-    /* Allocate back-buffer from extended memory (above 1 MB) to avoid
-     * the VGA legacy hole at 0xA0000-0xBFFFF that corrupts writes. */
+    real_fb = (volatile unsigned char *)fb.addr;
     draw_buf = (volatile unsigned char *)0x100000;
     fb_mem = draw_buf;
-    {
-        struct fb_info *h = (struct fb_info *)0x600;
-        h->width  = fb.width;
-        h->height = fb.height;
-        h->bpp    = fb.bpp;
-        h->addr   = (unsigned int)real_fb;
+
+    if (real_fb && real_fb != (void *)0xA0000 &&
+        vbe_read_reg(VBE_ID) >= 0xB0C0) {
+        unsigned int stride = fb.width * (fb.bpp / 8);
+        vbe_write_reg(VBE_VW, fb.width);
+        vbe_write_reg(VBE_VH, fb_size / stride);
+        vbe_write_reg(VBE_XOFF, 0);
+        vbe_write_reg(VBE_YOFF, 0);
     }
+
+    bi->width  = fb.width;
+    bi->height = fb.height;
+    bi->bpp    = fb.bpp;
+    bi->addr   = (unsigned int)real_fb;
+
     console_register_be(&scr_be);
+
+    /* Print status */
+    bm_puts("vga init: ");
+    bm_puts(mode_str);
+    bm_puts(", ");
+    bm_puts("FB copy");
+    bm_puts("\n");
 }
 
 static void draw_char_scaled(int x, int y, char c, unsigned int color, int sz) {
@@ -360,17 +393,29 @@ int  bm_ui_width(void) { return fb.width; }
 int  bm_ui_height(void) { return fb.height; }
 int  bm_ui_bpp(void) { return fb.bpp; }
 
-/* Swap: copy the main-RAM draw buffer into VGA framebuffer in one shot.
- * No YOFF flips — the display always scans out from real_fb.
- * Single bulk memcpy minimises QEMU dirty-page tracking artefacts. */
+/* Copy draw_buf (system RAM) to VRAM, then YOFF-flip to avoid tearing.
+ * The copy always targets the back (invisible) page; the front page is
+ * undisturbed during the copy, then YOFF switches instantly. */
 void fb_swap(void) {
+    static int page;
     if (!real_fb) return;
     unsigned int n = fb_size / 4;
     void *src = (void *)draw_buf;
-    void *dst = (void *)real_fb;
+    page = 1 - page;
+    void *dst = (void *)(real_fb + page * fb_size);
     __asm__ volatile(
         "cld\n\trep movsl\n"
         : : "S"(src), "D"(dst), "c"(n)
         : "memory"
     );
+    /* Wait for the start of vblank (rising edge of bit 3).
+     * First wait until NOT in vblank, then until IN vblank,
+     * so we synchronise to the beginning of the blanking period
+     * and have the full vblank window for the register write.
+     * Each loop checks is_aborting() so a GDB ^C (CR4 bit 24)
+     * can break out of the spin without hanging. */
+    while (inb(0x3DA) & 0x08) { if (is_aborting()) { bm_puts("fb_swap: io abort\r\n"); return; } }
+    while (!(inb(0x3DA) & 0x08)) { if (is_aborting()) { bm_puts("fb_swap: io abort\r\n"); return; } }
+    vbe_write_reg(VBE_XOFF, 0);
+    vbe_write_reg(VBE_YOFF, page * (fb.height));
 }

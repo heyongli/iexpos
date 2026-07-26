@@ -67,23 +67,15 @@ The IO abort provides a **per-CPU flag** that any loop can check, and any
 other CPU or interrupt handler can set. Implementation details in
 `docs/io-abort.md`.
 
-### UI / VGA / Framebuffer
+**Every IO abort check point MUST print an identifying message** (via
+`bm_puts`) before exiting the spin loop. This ensures the developer can see
+exactly which loop was interrupted, and whether the abort happened early or
+late in the boot sequence — without having to single-step through GDB.
 
-Double-buffered rendering with a single software backbuffer:
+### Framebuffer / VGA
 
-```
-console (text) ──┐
-UI (progress)  ──┤
-demos (orbit)  ──┤
-                 ▼
-          draw_buf (backbuffer, extended memory)
-                 │
-          bm_flush (dirty-row memcpy)
-                 ▼
-          fb_mem (VBE linear framebuffer, PCI MMIO)
-```
-
-Design decisions in `docs/vga-driver.md`.
+The hybrid draw-buffer + YOFF page-flip design and all VGA driver decisions
+are documented in `docs/vga-driver.md`.
 
 ## Key Implementation Details
 

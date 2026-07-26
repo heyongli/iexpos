@@ -1,5 +1,6 @@
 #include "demo.h"
 #include "baremetal.h"
+#include "bmX86/io.h"   /* includes ../include/io.h for BIT, _IO_OK */
 
 static const int cos_tab[256] = {
   256,  255,  255,  255,  254,  254,  253,  252,
@@ -81,6 +82,7 @@ int demo_orbit(void) {
     if (frame == 0) {
         frame = 1;
     }
+    mdelay(5);
     for (i = 0; i < 4; i++) {
         int a = frame * 3;
         int rx = (off[i*2] * cos_tab[a & 255] - off[i*2+1] * sin_tab[a & 255]) / 256;
