@@ -44,12 +44,15 @@ def send_recv(s, raw, wait=0.3):
     s.sendall(raw)
     time.sleep(wait)
     resp = b''
+    s.settimeout(2)
     try:
         while True:
             d = s.recv(4096)
             if not d: break
             resp += d
+            if b'#' in resp: break
     except: pass
+    s.settimeout(15)
     return resp
 
 def parse_pkt(data):
@@ -82,12 +85,14 @@ else:
     print(f"WARN: boot output not seen ({len(buf)} bytes received)")
 
 # Drain any trailing boot output
-time.sleep(0.5)
+s.settimeout(0.5)
+time.sleep(0.2)
 try:
     while True:
         d = s.recv(4096)
         if not d: break
 except: pass
+s.settimeout(15)
 
 # ---- Test 1: ? query → S05 stop reply ----
 # The first ? enters handler from poll (gdb_from_poll=1), S05 is sent.
