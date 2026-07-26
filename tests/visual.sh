@@ -11,15 +11,17 @@ SER=/tmp/qemu-vm-serial
 SCR=/tmp/qemu-vm-screendump.ppm
 MON_PORT=4444
 
-echo "=== Building ==="
-make -C $DIR clean all 2>&1 | tail -3
+if [ "$1" != "--no-build" ]; then
+    echo "=== Building ==="
+    make -C $DIR clean all 2>&1 | tail -3
+fi
 
 echo ""
 echo "=== Booting VM (visual test) ==="
 
 # Launch QEMU with HMP monitor on TCP
 timeout 16 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
-  -hda $DISK -net none \
+  -drive file=$DISK,format=raw -net none \
   -monitor tcp:127.0.0.1:$MON_PORT,server,nowait \
   -serial file:$SER &
 

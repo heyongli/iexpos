@@ -9,6 +9,10 @@ void setup_main(void) {
     bm_init();
     bm_puts("vga init done\n");
 
+    if (!arch_io_abort_check()) {
+        bm_puts("WARNING: CPU does not support io abort (CR4 bit 24)\n");
+    }
+
     bm_puts("Graphics init OK\n");
     bm_puts("Resolution: ");
     write_dec(bm_ui_width());

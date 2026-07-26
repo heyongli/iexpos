@@ -1,4 +1,5 @@
 #include "include/uart.h"
+#include <baremetal.h>
 
 /* x86 serial hardware driver for 16550 UARTs
     WARNING: This module directly accesses x86 I/O ports (inb/outb).
@@ -29,8 +30,14 @@
     - Bit 6: TRANSMITTER EMPTY (1 = all sent)
 */
 
+#ifdef DEBUG
+#define ABORT_TRACE(op) bm_puts("ABORT: UART " op " ("); bm_puts(__func__); bm_puts(")\n")
+#else
+#define ABORT_TRACE(op) bm_puts("ABORT: UART " op "\n")
+#endif
+
 int uart_try_write(unsigned char c) {
-    if (io_abort_test()) return _IO_ERR | _ABORT;
+    if (is_aborting()) { ABORT_TRACE("write"); return _IO_ERR | _ABORT; }
     if (uart_iost() & _WRITE_READY) {
         __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
         return _IO_OK;
@@ -39,7 +46,7 @@ int uart_try_write(unsigned char c) {
 }
 
 int uart_try_read(unsigned char *c) {
-    if (io_abort_test()) return _IO_ERR | _ABORT;
+    if (is_aborting()) { ABORT_TRACE("read"); return _IO_ERR | _ABORT; }
     if (uart_iost() & _READ_READY) {
         __asm__ volatile("inb %1, %0" : "=a"(*c) : "Nd"(COM1));
         return _IO_OK;
@@ -51,7 +58,7 @@ int uart_busy_write(unsigned char c) {
     /* Busy write: spin until THR is empty or abort detected.
        Returns _IO_OK on success, _IO_ERR | _ABORT on abort. */
     while (!(uart_iost() & _WRITE_READY)) {
-        if (io_abort_test()) return _IO_ERR | _ABORT;
+        if (is_aborting()) { ABORT_TRACE("busy write"); return _IO_ERR | _ABORT; }
     }
     __asm__ volatile("outb %0, %1" : : "a"(c), "Nd"(COM1));
     return _IO_OK;
@@ -61,7 +68,7 @@ int uart_busy_read(unsigned char *c) {
     /* Busy read: spin until DATA READY or abort detected.
        Returns _IO_OK on success, _IO_ERR | _ABORT on abort. */
     while (!(uart_iost() & _READ_READY)) {
-        if (io_abort_test()) return _IO_ERR | _ABORT;
+        if (is_aborting()) { ABORT_TRACE("busy read"); return _IO_ERR | _ABORT; }
     }
     __asm__ volatile("inb %1, %0" : "=a"(*c) : "Nd"(COM1));
     return _IO_OK;
@@ -84,4 +91,9 @@ int uart_iost(void) {
     if (lsr & 1) ready |= _READ_READY;
     if (lsr & 0x20) ready |= _WRITE_READY;
     return ready;
+}
+
+/* IO abort arch check — verify CPU supports CR4 bit 24 */
+int arch_io_abort_check(void) {
+    return cpuid_family() >= 6;
 }

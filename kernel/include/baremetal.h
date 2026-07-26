@@ -12,6 +12,9 @@ void bm_rtc_format(char buf[9]);
 /* platform init — detects PCI/VBE/VGA, sets up framebuffer */
 void bm_init(void);
 
+/* IO abort mechanism — check if CPU supports CR4 bit 24 */
+int arch_io_abort_check(void);
+
 /* bitmap UI — optional, safe to call even if no framebuffer */
 int  bm_ui_ready(void);
 void bm_ui_clear(unsigned int color);

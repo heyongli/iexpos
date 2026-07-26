@@ -1,61 +1,61 @@
-# iexpos — 项目文档与工作流指引
+# iexpos — Project Documentation & Workflow Guide
 
-> 本文件是项目索引，**不需要一次性加载全部内容**。
+> This file is the project index, **no need to load all content at once**.
 > 
-> 工作原则：
-> 1. 文件需要先用一句话说明其角色，再 Read 具体内容；不预先加载全部 context
-> 2. 修改模块时，根据下方索引找到对应文件再 Read，不同时加载无关文件
-> 3. 只读当前任务需要的文件，用完即止
+> Working Principles:
+> 1. Files should first be described in one sentence about their role, then Read specific content; don't preload all context
+> 2. When modifying a module, find the corresponding file based on the index below and Read it, don't load unrelated files at the same time
+> 3. Only read files needed for the current task, stop when done
 
-## 文件索引
+## File Index
 
-> **外部引用文档为参考文档，仅在需要时加载为 context，不预先读取。**
+> **External reference documents are for reference only, load as context only when needed, don't read in advance.**
 
-- boot/boot.asm 引导加载内核
-- boot/entry.asm GDT+CR0, 跳 setup_main
+- boot/boot.asm - Boot loader loads kernel
+- boot/entry.asm - GDT+CR0, jump to setup_main
 
-- kernel/setup.c 入口, bm_init, 打印, 运行demo
-- kernel/console.c/h 环缓冲, 后端分发
-- include/baremetal.h 统一平台 API
-- include/font_8x16.h 字体
+- kernel/setup.c - Entry, bm_init, print, run demo
+- kernel/console.c/h - Ring buffer, backend dispatch
+- include/baremetal.h - Unified platform API
+- include/font_8x16.h - Font
 
-- bmX86/vga.c/h VGA驱动
-- bmX86/rtc.c/h RTC驱动
-- include/vbe.h VBE结构体
+- bmX86/vga.c/h - VGA driver
+- bmX86/rtc.c/h - RTC driver
+- include/vbe.h - VBE struct
 
-- ui/ui.c/h 进度条
+- ui/ui.c/h - Progress bar
 
-- demos/demos.h demo入口
-- demos/orbit.c 旋转动画
+- demos/demos.h - Demo entry
+- demos/orbit.c - Rotation animation
 
-- tests/serial.sh 串口测试
-- tests/visual.sh 画面测试
-- tests/gdb-qemu.sh QEMU单步跟踪
-- docs/gdb-qemu.md QEMU GDB文档
-- docs/gdb.md GDB stub实现
-- docs/serial.md 串口设计
-- docs/io-ports.md I/O端口速查
+- tests/serial.sh - Serial test
+- tests/visual.sh - Visual test
+- tests/gdb-qemu.sh - QEMU single step trace
+- docs/gdb-qemu.md - QEMU GDB documentation
+- docs/gdb-serial.md - GDB stub implementation
+- docs/serial.md - Serial port design
+- docs/io-ports.md - I/O port reference
 
-## 构建与测试
+## Build & Test
 
 ```bash
-make clean all           # 构建 (产物在 build/)
-./test.sh                # 运行全部测试
-tests/serial.sh          # 单独串口测试
-tests/visual.sh          # 单独画面测试
+make clean all           # Build (output in build/)
+./test.sh                # Run all tests
+tests/serial.sh          # Run serial test alone
+tests/visual.sh          # Run visual test alone
 ```
 
-## 关键约定
+## Key Conventions
 
-- **不要自动 commit**，只有明确要求时才 commit
+- do not commit code without permit
 - C: `-m32 -ffreestanding -fno-PIC -nostdlib -fno-asynchronous-unwind-tables`
 - ASM kernel: NASM `-f elf32`; boot: NASM `-f bin [org 0x7c00]`
-- 链接: `ld -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n`
-- 无标准库, 栈: `mov esp, 0x7C00`
-- kernel.bin 起始 4 字节即 entry.asm (链接在第一位)
-- 内核加载地址: 0x7E00, BSS 靠 `-n` 避免落到 0xA0000
+- Linker: `ld -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n`
+- No standard library, stack: `mov esp, 0x7C00`
+- kernel.bin first 4 bytes is entry.asm (linked first)
+- Kernel load address: 0x7E00, BSS uses `-n` to avoid hitting 0xA0000
 
-GDB (QEMU) 调试详情见 `docs/gdb-qemu.md`。
-调试串口标记见 `docs/serial.md`。
+GDB (QEMU) debugging details: `docs/gdb-qemu.md`
+Debug serial port markers: `docs/serial.md`
 
-I/O 端口速查见 `docs/io-ports.md`。
+I/O port reference: `docs/io-ports.md`.

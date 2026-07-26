@@ -31,7 +31,7 @@ echo ""
 echo "=== GDB single-step test ==="
 
 timeout 18 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
-    -hda $DISK -net none -serial file:$TMP_OUT -gdb tcp::1234 -S &
+    -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT -gdb tcp::1234 -S &
 QEMU_PID=$!
 sleep 0.5
 

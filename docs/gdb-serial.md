@@ -154,3 +154,147 @@ if (!gdb_from_poll) r->eip--;
 | 检查 RX 通路 | 写测试数据到 chardev，确认 LSR.DR 翻转 + RBR 可读 |
 | 检查 TX 通路 | `serial_out` 写字节，确认 TCP 侧收到 |
 | 测试完整协议 | Python `socket` 模拟 GDB client：`+` → 等 `$T05` → `+$c#63` → 确认回复 `+`
+
+## 调试示例
+
+### 启动步骤
+
+**终端 1** — 启动 QEMU (串口重定向到 TCP):
+```bash
+qemu-system-x86_64 \
+  -enable-kvm -m 2G -nographic -smp 2 -vga std \
+  -drive file=build/vm-raw.img,format=raw \
+  -net none \
+  -serial tcp::12346,server,nowait
+```
+
+**终端 2** — 使用 Python 模拟 GDB 客户端:
+```python
+import socket, time
+
+s = socket.socket()
+s.connect(('localhost', 12346))
+s.settimeout(10)
+
+# 等待内核启动
+buf = b''
+while b'Graphics test complete' not in buf:
+    d = s.recv(4096)
+    if not d: break
+    buf += d
+
+# 发送触发字符
+s.sendall(b'+')
+time.sleep(0.5)
+
+# 读取响应
+resp = s.recv(4096)
+print(f"Response: {resp}")
+```
+
+**终端 2** — 或使用 GDB 连接串口:
+
+方法 A: 用 socat 创建虚拟串口:
+```bash
+# 终端 2: 创建 pty 桥接
+socat PTY,link=/tmp/gdb-serial,rawer TCP:localhost:12346 &
+
+# 终端 3: GDB 连接 pty
+gdb build/kernel.elf
+(gdb) target remote /tmp/gdb-serial
+(gdb) break setup_main
+(gdb) continue
+```
+
+方法 B: 用 Python 测试串口通信 (推荐):
+```python
+import socket, time
+
+s = socket.socket()
+s.connect(('localhost', 12346))
+s.settimeout(10)
+
+# 等待内核启动
+buf = b''
+while b'Graphics test complete' not in buf:
+    d = s.recv(4096)
+    if not d: break
+    buf += d
+
+# 发送触发字符
+s.sendall(b'+')
+time.sleep(0.5)
+
+# 读取响应
+resp = s.recv(4096)
+print(f"Response: {resp}")
+```
+
+### 串口 GDB 协议
+
+内核中的 GDB stub 实现了最小 Remote Serial Protocol:
+
+```
+# 状态查询
+GDB → stub:  $?#00             # 查询状态
+stub → GDB:  $S05#00           # SIGTRAP (已停止)
+
+# 继续执行
+GDB → stub:  $c#00             # continue
+stub → GDB:  $OK#00
+
+# 读寄存器
+GDB → stub:  $g#00             # 读全部寄存器
+stub → GDB:  $00000000...#72   # 72 字节 hex
+
+# 读内存
+GDB → stub:  $m7e00,10#00     # 读 0x7E00 起 16 字节
+stub → GDB:  $0f...#00        # hex 编码数据
+```
+
+### GDB 命令行工具
+
+使用 socat 创建虚拟串口连接:
+```bash
+# 安装 socat
+sudo apt install socat
+
+# 创建 pty 桥接
+socat PTY,link=/tmp/gdb-serial,rawer TCP:localhost:12346 &
+
+# GDB 连接 pty
+gdb build/kernel.elf
+(gdb) target remote /tmp/gdb-serial
+(gdb) break setup_main
+(gdb) continue
+```
+
+### 检查串口状态
+
+在内核代码中添加调试输出:
+```c
+// 检查 LSR 状态
+unsigned char lsr;
+__asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"(0x3FD));
+bm_puts("LSR: 0x");
+bm_put_hex(lsr);
+bm_puts("\n");
+```
+
+### 常见问题
+
+**串口收不到数据?**
+```bash
+# 检查串口配置
+stty -F /dev/ttyS0 115200 cs8 -cstopb -parenb
+
+# 检查权限
+ls -l /dev/ttyS0
+sudo chmod 666 /dev/ttyS0
+```
+
+**如何在真机上调试?**
+1. 使用 USB-to-Serial 适配器连接目标机串口
+2. 在目标机上运行 iexpos
+3. 在主机上使用 GDB 连接串口
+4. 设置断点、单步调试

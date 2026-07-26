@@ -155,4 +155,4 @@ void gdb_poll(void) {
 |----------|--------|------|
 | `tests/serial.sh` | 写通路 (PMOK, entry, ...) | 抓串口输出 `grep` 关键字 |
 | `tests/serial-rw.sh` | 读写闭环 (loopback) | `grep SRW:P` |
-| `tests/serial-gdb.sh` | 串口全双工 + GDB 协议 | Python socket `+` → `$T05` → `$c` |
+| `tests/gdb-over-serial-protocol.sh` | 串口全双工 + GDB 协议 | Python socket `?`/`g`/`m`/`M`/`P`/`c` 包交互 |

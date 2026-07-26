@@ -1,19 +1,21 @@
 #!/bin/bash
 # Test: serial output contains expected boot markers
 # Checks: PMOK (boot PM switch), entry (C main), Graphics init OK (console),
-#         Graphics test complete (full demo ran to end)
+#         Resolution detected, Graphics test complete (full demo ran to end)
 set -e
 
 DIR=~/iexpos
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-test-output.txt
 
-echo "=== Building ==="
-make -C $DIR clean all
+if [ "$1" != "--no-build" ]; then
+    echo "=== Building ==="
+    make -C $DIR clean all
+fi
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-sg kvm -c "timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none" 2>&1 | tee $TMP_OUT
+sg kvm -c "timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none" 2>&1 | tee $TMP_OUT
 
 echo ""
 echo "=== Verifying output ==="
@@ -36,6 +38,7 @@ check() {
 check "Bootloader PM switch"     "PMOK"
 check "C kernel running"         "entry"
 check "Graphics init"            "Graphics init OK"
+check "Resolution detected"      "Resolution: [0-9]*x[0-9]*x[0-9]"
 check "Graphics test complete"   "Graphics test complete"
 
 echo ""

@@ -1,13 +1,14 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I demos -I kernel -I kernel/include
+CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I demos -I kernel -I kernel/include -I gdb-stub
+CFLAGS_DEBUG = $(CFLAGS) -DDEBUG
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
 LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
-        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o $(BDIR)/serial.o $(BDIR)/uart.o
+        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
@@ -35,11 +36,20 @@ $(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
 $(BDIR)/io.o: io.c include/io.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h kernel/gdb_stub.h | $(BDIR)
+$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h demos/demos.h gdb-stub/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/gdb_stub.o: kernel/gdb_stub.c kernel/gdb_stub.h | $(BDIR)
+$(BDIR)/gdb_stub.o: gdb-stub/gdb_stub.c gdb-stub/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/gdb_io.o: gdb-stub/gdb_io.c gdb-stub/gdb_io.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/gdb_idt.o: gdb-stub/gdb_idt.c gdb-stub/gdb_idt.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/tramp.o: gdb-stub/tramp.asm | $(BDIR)
+	$(AS) -f elf32 $< -o $@
 
 $(BDIR)/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -65,22 +75,25 @@ $(BDIR)/vm-raw.img: $(BDIR)/image.bin
 	dd if=$< of=$@ conv=notrunc 2>/dev/null
 
 run: $(BDIR)/vm-raw.img
-	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none"
+	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$$(pwd)/$(BDIR)/vm-raw.img,format=raw -net none"
 
 run-curses: $(BDIR)/vm-raw.img
-	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -display curses -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none"
+	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -display curses -smp 2 -vga std -drive file=$$(pwd)/$(BDIR)/vm-raw.img,format=raw -net none"
 
 gdb-qemu: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 	@echo "=== GDB via QEMU ==="
 	@echo "Run: gdb -x tests/gdb-qemu.gdb"
 	@echo ""
-	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $$(pwd)/$(BDIR)/vm-raw.img -net none -s -S"
+	sg kvm -c "qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$$(pwd)/$(BDIR)/vm-raw.img,format=raw -net none -s -S"
 
 gdb-test: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 	@echo "=== GDB via QEMU (automated test) ==="
 	DIR=$(CURDIR) tests/gdb-qemu.sh
 
-.PHONY: all run run-curses gdb-qemu gdb-stub-test clean
+.PHONY: all run run-curses gdb-qemu gdb-stub-test clean debug
 
 clean:
 	rm -rf $(BDIR) kernel/*.o
+
+debug:
+	$(MAKE) CFLAGS="$(CFLAGS_DEBUG)" all

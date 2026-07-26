@@ -8,12 +8,14 @@ DIR=~/iexpos
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-serial-rw.txt
 
-echo "=== Building ==="
-make -C $DIR clean all
+if [ "$1" != "--no-build" ]; then
+    echo "=== Building ==="
+    make -C $DIR clean all
+fi
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -hda $DISK -net none -serial file:$TMP_OUT 2>/dev/null
+timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT 2>/dev/null
 
 echo ""
 echo "=== Verifying serial read/write ==="
