@@ -6,15 +6,15 @@ functions and macros listed below.
 
 The API is split across closures:
 
-| Function              | Closure      | Doc              |
-|-----------------------|--------------|------------------|
-| `bm_puts / bm_flush`  | `kernel`     | `docs/kernel.md` |
-| `bm_rtc_*`            | `silx/<arch>`| `docs/serial.md` / per-driver |
-| `bm_init`             | `silx/<arch>`| `docs/vga-driver.md` |
-| `arch_io_abort_check` | `silx/<arch>`| `docs/io-abort.md` |
-| `bm_ui_*` (rect ops)  | `silx/<arch>`| `docs/vga-driver.md` |
-| `fb_swap`             | `silx/<arch>`| `docs/vga-driver.md` |
-| `ui_draw_*`           | `ui`         | `docs/ui.md`     |
+| Function              | Closure      | Doc                                |
+|-----------------------|--------------|------------------------------------|
+| `bm_puts / bm_flush`  | `kernel`     | `docs/kernel.md`                   |
+| `bm_rtc_*`            | `silx/<arch>`| `docs/serial.md` / per-driver      |
+| `bm_init`             | `silx/<arch>`| `silx/x86/silx_x86_vga.md`         |
+| `arch_io_abort_check` | `silx/<arch>`| `docs/io-abort.md`                 |
+| `bm_ui_*` (rect ops)  | `silx/<arch>`| `silx/x86/silx_x86_vga.md`         |
+| `fb_swap`             | `silx/<arch>`| `silx/x86/silx_x86_vga.md`         |
+| `ui_draw_*`           | `ui`         | `ui/ui.md`                         |
 
 Text rendering (`ui_draw_char`, `ui_draw_str`) is **not** part of the baremetal
 contract — it lives in `ui/ui.h` because the font is a ui concern, not a

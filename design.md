@@ -115,7 +115,7 @@ BIOS → boot.asm (16-bit, VBE + disk) → entry.asm (PM switch) → kernel C
 ### Framebuffer / VGA
 
 The hybrid draw-buffer + YOFF page-flip design and all VGA driver decisions
-are documented in `docs/vga-driver.md`.
+are documented in `silx/x86/silx_x86_vga.md`.
 
 ## Key Implementation Details
 
