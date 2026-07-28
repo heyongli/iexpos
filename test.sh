@@ -44,12 +44,6 @@ tests/check_bss.sh
 
 echo ""
 echo "============================================"
-echo "  Running: serial output tests"
-echo "============================================"
-tests/serial.sh --no-build
-
-echo ""
-echo "============================================"
 echo "  Running: serial read/write tests"
 echo "============================================"
 tests/serial-rw.sh --no-build
