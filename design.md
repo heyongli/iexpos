@@ -42,6 +42,40 @@ so the BIOS jump to `0x7E00` lands on `entry`. See `docs/bootloader.md`.
 - Explicit dependency graph per closure; closed-loop internals; no peer deps.
 - Any closure lifts out of the tree and builds in a separate environment.
 
+### Documentation placement
+
+- **Top-level `docs/`** — external interfaces and cross-cutting concerns
+  only. A doc belongs here iff it (a) defines an API contract that other
+  closures consume, (b) cross-cuts two or more closures, or (c) describes
+  the main program / boot stage (which are not closures).
+- **`<closure>/docs/`** — a closure's internal docs. Files are prefixed
+  with the closure name (`<closure>_<topic>.md`); the `/` in `silx/x86`
+  becomes `_` so the prefix is `silx_x86_` if needed in the future, but
+  since subdirs of a closure (like `silx/x86/`) are not closures
+  themselves, the prefix is just the top-level closure name.
+- Only top-level directories count as closures. `silx/x86/` is the
+  x86 implementation of the `silx` closure — internal to it, not a peer.
+  `kernel/` and `boot/` are not closures (main program and stage
+  respectively).
+
+Current layout:
+
+```
+docs/                                  ← external / cross-cutting
+├── bare-metal-interface.md              (the platform API contract)
+├── bootloader.md                        (boot/ stage — not a closure)
+├── kernel.md                            (kernel/ main program — not a closure)
+├── io-abort.md                          (cross-cuts silx busy waits + gdb-stub INT3)
+├── io-ports.md                          (port reference table)
+├── gdb-qemu.md                          (cross-cutting debug how-to)
+├── gdb-serial.md                        (gdb-stub protocol; user-facing)
+└── serial.md                            (silx/x86/uart.c internals, partly cross-cuts gdb-stub)
+
+silx/docs/silx_vga.md                  ← silx closure-internal (x86 VGA driver)
+gdb-stub/docs/gdb-stub_internal.md     ← gdb-stub closure-internal (architecture + debug journal)
+ui/docs/ui.md                          ← ui closure-internal (font, text, screen backend, progress)
+```
+
 ### Hardware execution invariants (silx)
 
 - **Shortest-execution-time rule** — primitives run at bare-silicon speed.
@@ -115,7 +149,7 @@ BIOS → boot.asm (16-bit, VBE + disk) → entry.asm (PM switch) → kernel C
 ### Framebuffer / VGA
 
 The hybrid draw-buffer + YOFF page-flip design and all VGA driver decisions
-are documented in `silx/x86/silx_x86_vga.md`.
+are documented in `silx/docs/silx_vga.md`.
 
 ## Key Implementation Details
 

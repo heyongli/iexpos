@@ -99,5 +99,5 @@ Implementation is split across closures:
 
 Text rendering (`ui_draw_char` / `ui_draw_str`) was deliberately moved out of
 `silx/x86` because it depends on the font (`ui/font_8x16.h`), which is a
-**ui** concern, not a hardware primitive. See `ui/ui.md` and
+**ui** concern, not a hardware primitive. See `ui/docs/ui.md` and
 `docs/bare-metal-interface.md`.

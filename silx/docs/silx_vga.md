@@ -126,7 +126,7 @@ while (!(inb(0x3DA) & 0x08)) { if (is_aborting()) { bm_puts("fb_swap: io abort\r
 
 The driver implements the framebuffer subset of the baremetal API declared
 in `kernel/include/baremetal.h`. Text rendering (`ui_draw_*`) is **not**
-implemented here — it lives in `ui/text.c` (see `ui/ui.md`).
+implemented here — it lives in `ui/text.c` (see `ui/docs/ui.md`).
 
 | Function                            | Description                          |
 |-------------------------------------|--------------------------------------|
@@ -205,7 +205,7 @@ init: struct copy 0x600 → fb
 
 The screen console backend (text rendering) is **not** registered here. It
 is owned by the ui closure and must be wired up separately via `ui_init()`
-(see `ui/ui.md`).
+(see `ui/docs/ui.md`).
 
 The check `fb.addr != 0xA0000` distinguishes VBE from VGA 13h. When VBE
 succeeded, the raw mode-info block is available at `0x10000` and is parsed
