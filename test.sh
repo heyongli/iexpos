@@ -44,9 +44,9 @@ tests/check_bss.sh
 
 echo ""
 echo "============================================"
-echo "  Running: serial read/write tests"
+echo "  Running: CLI interaction tests"
 echo "============================================"
-tests/serial-rw.sh --no-build
+tests/cli.sh --no-build
 
 echo ""
 echo "============================================"

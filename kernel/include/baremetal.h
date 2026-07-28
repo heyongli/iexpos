@@ -3,6 +3,7 @@
 
 /* console — writes to serial + screen buffer, always available */
 void bm_puts(const char *s);
+void bm_puts_raw(const char *s);  /* no timestamp prefix */
 void bm_flush(void);
 
 /* RTC — always available */

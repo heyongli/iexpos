@@ -8,7 +8,7 @@ LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
 OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/text.o $(BDIR)/rtc.o \
-        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/progress.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o $(BDIR)/io.o
+        $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/progress.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o $(BDIR)/io.o $(BDIR)/cli.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
 
@@ -36,7 +36,10 @@ $(BDIR)/serial.o: silx/x86/serial.c silx/x86/include/serial_dev.h | $(BDIR)
 $(BDIR)/io.o: silx/x86/io.c silx/x86/io.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h ui/ui.h gdb-stub/gdb_stub.h | $(BDIR)
+$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h ui/ui.h gdb-stub/gdb_stub.h kernel/cli.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/cli.o: kernel/cli.c kernel/cli.h kernel/include/baremetal.h gdb-stub/gdb_io.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/gdb_stub.o: gdb-stub/gdb_stub.c gdb-stub/gdb_stub.h | $(BDIR)

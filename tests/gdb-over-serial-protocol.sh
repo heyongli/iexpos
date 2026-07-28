@@ -148,6 +148,17 @@ try:
 except: pass
 s.settimeout(15)
 
+# Switch kernel from CLI to GDB mode
+s.sendall(b'gdb\n')
+time.sleep(1)
+s.settimeout(0.5)
+try:
+    while True:
+        d = s.recv(4096)
+        if not d: break
+except: pass
+s.settimeout(15)
+
 # ---- Test 1: ? query → S05 stop reply ----
 resp = send_recv(s, pkt("?"))
 p = parse_pkt(resp)

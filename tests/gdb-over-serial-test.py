@@ -51,6 +51,19 @@ def main():
 
     fd = os.open(pty_path, os.O_RDWR | os.O_NONBLOCK)
 
+    # First switch from CLI to GDB mode
+    os.write(fd, b'gdb\n')
+    time.sleep(1.0)
+
+    # Drain any response
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        try:
+            d = os.read(fd, 4096)
+            if not d: break
+        except: pass
+        time.sleep(0.1)
+
     # Send ? packet via PTY - triggers gdb_poll, handler processes ?
     os.write(fd, b'$?#3f')
     time.sleep(0.5)

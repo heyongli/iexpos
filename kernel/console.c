@@ -69,6 +69,17 @@ void console_write(const char *s) {
     }
 }
 
+void console_write_raw(const char *s) {
+    if (!n_be)
+        console_register_be(&serial_be);
+
+    for (const char *p = s; *p; p++) {
+        buf_put(*p);
+        for (int j = 0; j < n_be; j++)
+            backends[j]->write(p, 1);
+    }
+}
+
 void console_flush(void) {
     for (int j = 0; j < n_be; j++)
         if (backends[j]->flush)
@@ -76,5 +87,6 @@ void console_flush(void) {
 }
 
 void bm_puts(const char *s) { console_write(s); }
+void bm_puts_raw(const char *s) { console_write_raw(s); }
 void bm_flush(void) { console_flush(); }
 

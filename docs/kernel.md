@@ -54,6 +54,25 @@ setup_main()
         └── gdb_poll()       gdb-stub  non-blocking poll for GDB packet
 ```
 
+## CLI — `kernel/cli.c`
+
+The kernel includes a minimal **CLI (Command Line Interface)** running entirely in
+kernel mode. It is a debugging, development, and testing assistant tool — not a
+user shell.
+
+### Design Notes
+
+- **No stdlib** — uses `baremetal.h` primitives (`bm_puts_raw`, `bm_ui_*`)
+- **Fixed buffer** — 128-byte line buffer (`CLI_BUF_SIZE`), line editing via backspace/Ctrl-C
+- **No command history** — minimal for kernel-mode debugging
+- **Polling I/O** — `gdb_io_data_ready()` + `gdb_io_try_read()` (non-blocking)
+
+
+### Commands
+
+See `docs/kernel-cli.md` for full command reference (`help`, `info`, `test`, `echo`, `hex`, `gdb`).
+
+
 ## Console — `kernel/console.c`
 
 `bm_puts` writes to all registered `console_be` backends and prepends a

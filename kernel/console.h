@@ -7,6 +7,7 @@ struct console_be {
 };
 
 void console_write(const char *s);
+void console_write_raw(const char *s);
 void console_flush(void);
 void console_register_be(struct console_be *be);
 

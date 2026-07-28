@@ -4,6 +4,7 @@
 #include "ui.h"
 #include "silx/x86/io.h"
 #include "silx/x86/include/os_regs.h"
+#include "cli.h"
 
 static void write_dec(int val);
 
@@ -36,6 +37,9 @@ void setup_main(void) {
 
     bm_puts("gdb stub done\n");
 
+    /* Initialize CLI */
+    cli_init();
+
     unsigned int last_frame = pit_read();
 
     while (1) {
@@ -44,7 +48,10 @@ void setup_main(void) {
             fb_swap();
             last_frame = pit_read();
         }
-        gdb_poll();
+        if (cli_is_active())
+            cli_poll();
+        else
+            gdb_poll();
         if (is_aborting()) return;
     }
 }
