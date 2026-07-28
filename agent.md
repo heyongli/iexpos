@@ -17,7 +17,7 @@ module-specific content in `design.md`.
 
 ## work flow
 
-- After modifying source files, run `make clean all` to verify compilation, then run the **module-specific test** (e.g. `tests/vga.sh` for VGA, `tests/serial.sh` for serial). Only if asked to commit, run `./test.sh` to execute all tests and fix any failures found.
+- After modifying source files, run `make clean all` to verify compilation, then run the **module-specific test** (e.g. `tests/vga.sh` for VGA, `tests/serial.sh` for serial). Before committing, run `./test.sh` to ensure all tests pass.
 - change code should update related docs
 -  Build & Test , do make clean all and rebuild test for any change
 -  run specific test for code changes
