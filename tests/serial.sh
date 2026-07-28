@@ -49,7 +49,7 @@ set -e
 
 DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
-TMP_OUT=/tmp/vm-test-output.txt
+TMP_OUT=$(mktemp /tmp/vm-serial-XXXXXX.txt)
 
 if [ "$1" != "--no-build" ]; then
     echo "=== Building ==="
@@ -58,7 +58,8 @@ fi
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none 2>&1 | tee $TMP_OUT
+source $DIR/tests/kvm-check.sh
+timeout 12 qemu-system-x86_64 $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none 2>&1 | tee $TMP_OUT
 
 echo ""
 echo "=== Verifying output ==="

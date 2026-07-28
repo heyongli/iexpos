@@ -50,8 +50,9 @@ DISPLAY_FLAG="-vnc :0"
 echo "  Display backend: $DISPLAY_FLAG"
 
 # ---- start QEMU ----
+source "$DIR/tests/kvm-check.sh"
 qemu-system-x86_64 \
-    -enable-kvm -m 512M -smp 2 -vga std \
+    $(get_kvm_flag) -m 512M -smp 2 -vga std \
     -drive file=$DISK,format=raw \
     -net none \
     $DISPLAY_FLAG \

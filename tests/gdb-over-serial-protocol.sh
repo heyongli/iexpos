@@ -59,12 +59,19 @@ trap cleanup EXIT
 
 echo "=== GDB serial protocol test ==="
 
+BDIR=build
+PORT=12346
+
+cleanup() { kill $QEMU_PID 2>/dev/null || true; fuser -k "$PORT"/tcp 2>/dev/null || true; }
+trap cleanup EXIT
+
 make -sC "$(pwd)" clean all 2>&1 | tail -1
 [ -f "$BDIR/vm-raw.img" ] || { echo "FAIL: no vm-raw.img"; exit 1; }
 
 fuser -k "$PORT"/tcp 2>/dev/null || true
+source "$(pwd)/tests/kvm-check.sh"
 qemu-system-x86_64 \
-    -enable-kvm -m 2G -nographic -smp 2 -vga std \
+    $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std \
     -drive file="$BDIR/vm-raw.img",format=raw \
     -net none \
     -serial tcp::"$PORT",server,nowait \

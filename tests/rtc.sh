@@ -42,7 +42,7 @@ set -e
 
 DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
-TMP_OUT=/tmp/vm-rtc.txt
+TMP_OUT=$(mktemp /tmp/vm-rtc-XXXXXX.txt)
 
 if [ "$1" != "--no-build" ]; then
     echo "=== Building ==="
@@ -51,7 +51,8 @@ fi
 
 echo ""
 echo "=== Booting VM (RTC test) ==="
-timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
+source $DIR/tests/kvm-check.sh
+timeout 12 qemu-system-x86_64 $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std \
     -drive file=$DISK,format=raw -net none -serial file:$TMP_OUT -monitor none 2>/dev/null || true
 
 echo ""

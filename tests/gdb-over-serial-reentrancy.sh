@@ -67,8 +67,9 @@ make -sC $DIR clean all 2>&1 | tail -1
 fuser -k "$PORT"/tcp 2>/dev/null || true
 
 echo "  Starting QEMU (serial tcp::$PORT)..."
+source $DIR/tests/kvm-check.sh
 qemu-system-x86_64 \
-    -enable-kvm -m 2G -nographic -smp 2 -vga std \
+    $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std \
     -drive file=$DISK,format=raw \
     -net none \
     -serial tcp::"$PORT",server,nowait \

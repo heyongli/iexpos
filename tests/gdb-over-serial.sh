@@ -66,11 +66,12 @@ PORT=12347
 PTY=$DIR/tests/gdb-serial-ptest
 DISK=$BDIR/vm-raw.img
 ELF=$BDIR/kernel.elf
+TMP_OUT=$(mktemp /tmp/gdb-serial-XXXXXX.txt)
 
 cleanup() {
     kill $QEMU_PID 2>/dev/null || true
     kill $SOCAT_PID 2>/dev/null || true
-    rm -f $PTY
+    rm -f $PTY $TMP_OUT
     fuser -k "$PORT"/tcp 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -88,8 +89,9 @@ fuser -k "$PORT"/tcp 2>/dev/null || true
 
 # Start QEMU with serial on TCP
 echo "  Starting QEMU (serial tcp::$PORT)..."
+source $DIR/tests/kvm-check.sh
 qemu-system-x86_64 \
-    -enable-kvm -m 2G -nographic -smp 2 -vga std \
+    $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std \
     -drive file=$DISK,format=raw \
     -net none \
     -serial tcp::"$PORT",server,nowait \
@@ -165,7 +167,7 @@ timeout 60 gdb "$BDIR/kernel.elf" -q -batch \
   -ex "backtrace" \
   -ex "detach" \
   -ex "echo DONE\n" \
-  2>&1 | tee /tmp/gdb-over-serial-output.txt
+  2>&1 | tee $TMP_OUT
 
 RC2=${PIPESTATUS[0]}
 
@@ -175,7 +177,7 @@ FAIL_CNT=0
 
 check_result() {
     local name="$1" pattern="$2"
-    if grep -q "$pattern" /tmp/gdb-over-serial-output.txt 2>/dev/null; then
+    if grep -q "$pattern" $TMP_OUT 2>/dev/null; then
         echo "  PASS: $name"
         PASS_CNT=$((PASS_CNT + 1))
     else

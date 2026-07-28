@@ -56,16 +56,30 @@ DIR=$(pwd)
 
 ### 3. Temporary Files
 
-Use `/tmp/` prefix with `TMP_` variable names:
+**Use `mktemp` to generate unique temp file names.** Fixed names cause
+conflicts when multiple tests run in parallel.
 
 ```bash
-TMP_OUT=/tmp/vm-xxx.txt
+# Wrong: fixed name, conflicts with other tests
+TMP_OUT=/tmp/vm-test-output.txt
+
+# Correct: unique name per test run
+TMP_OUT=$(mktemp /tmp/vm-test-XXXXXX.txt)
 ```
 
 Clean up after test completes:
 
 ```bash
 rm -f $TMP_OUT
+```
+
+Always clean up in trap:
+
+```bash
+cleanup() {
+    rm -f $TMP_OUT
+}
+trap cleanup EXIT
 ```
 
 ### 4. QEMU Mode

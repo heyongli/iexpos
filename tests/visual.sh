@@ -46,8 +46,8 @@ set -e
 
 DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
-SER=/tmp/qemu-vm-serial
-SCR=/tmp/qemu-vm-screendump.ppm
+SER=$(mktemp /tmp/vm-serial-XXXXXX)
+SCR=$(mktemp /tmp/vm-screendump-XXXXXX.ppm)
 MON_PORT=4444
 
 if [ "$1" != "--no-build" ]; then
@@ -57,9 +57,10 @@ fi
 
 echo ""
 echo "=== Booting VM (visual test) ==="
+source $DIR/tests/kvm-check.sh
 
 # Launch QEMU with HMP monitor on TCP
-timeout 16 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std \
+timeout 16 qemu-system-x86_64 $(get_kvm_flag) -m 2G -nographic -smp 2 -vga std \
   -drive file=$DISK,format=raw -net none \
   -monitor tcp:127.0.0.1:$MON_PORT,server,nowait \
   -serial file:$SER &
