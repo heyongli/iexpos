@@ -7,7 +7,7 @@
  * Uses CR4 bit 24 (reserved on modern CPUs) as a fast abort flag.
  *
  * Purpose: Allow any code DO BUSY WAITING to be aborted.
- * TODO: Work across CPUs via IPI + per-CPU flag, or same CPU.
+ * Cross-CPU support is a TODO (see design.md).
  *
  * Flow:
  *   1. abort_io()      - Set the bit on target CPU (via IPI if remote)

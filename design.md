@@ -182,3 +182,18 @@ defaults. This has caused multiple bugs in this project.
 - Manual check: `nm -n kernel.elf | tail -20` to verify BSS end < 0xA0000.
 - For any new static buffer ≥ 64 KB, compute `&buf + sizeof(buf)` and confirm
   it does not intersect 0xA0000–0xBFFFF.
+
+## TODOs
+
+Deferred items tracked here so they don't get lost. Each entry references
+the code or doc that explains the problem.
+
+- [ ] **io abort: cross-CPU support** — `silx/x86/include/os_regs.h` uses
+  CR4 bit 24, which is per-CPU on Intel but may be visible across cores on
+  AMD. Need either an IPI + per-CPU flag, or a doc note restricting the
+  closure to Intel. Current code calls `is_aborting()` which locally
+  read-and-clears; cross-CPU abort needs an explicit IPI sender.
+- [ ] **Reorganise tests into closure dirs** — per-closure test suites
+  should live in `<closure>/tests/`; only kernel-level and global tests
+  in top-level `tests/`. Deferred until a full build run can validate the
+  test scripts at the new paths.
