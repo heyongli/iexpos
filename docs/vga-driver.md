@@ -122,19 +122,20 @@ while (!(inb(0x3DA) & 0x08)) { if (is_aborting()) { bm_puts("fb_swap: io abort\r
 - **32bpp linear** — VBE mode 0x4118 (1024×768), B-G-R-A byte order,
   little-endian.
 
-## Interface — `struct fb_ops`
+## Interface — `kernel/include/baremetal.h`
 
-Defined in `vga.h`, implemented in `vga.c`. Exported as the global
-`const struct fb_ops vga`.
+The driver implements the framebuffer subset of the baremetal API declared
+in `kernel/include/baremetal.h`. Text rendering (`ui_draw_*`) is **not**
+implemented here — it lives in `ui/text.c` (see `docs/ui.md`).
 
-| Member       | Signature                                       | Description              |
-|--------------|-------------------------------------------------|--------------------------|
-| `init`       | `void (*)(void)`                                | Detect mode, map fb      |
-| `putpixel`   | `void (*)(int x, int y, unsigned int color)`    | Draw one pixel           |
-| `fill_rect`  | `void (*)(int, int, int, int, unsigned int)`    | Fill rectangle           |
-| `clear`      | `void (*)(unsigned int color)`                  | Clear entire screen      |
-| `get_width`  | `int (*)(void)`                                 | Return screen width      |
-| `get_height` | `int (*)(void)`                                 | Return screen height     |
+| Function                            | Description                          |
+|-------------------------------------|--------------------------------------|
+| `bm_init()`                         | Detect mode, set up framebuffer      |
+| `bm_ui_ready()`                     | `_IO_OK` once framebuffer is mapped  |
+| `bm_ui_clear(color)`                | Fill whole fb with `color`           |
+| `bm_ui_fill_rect(x,y,w,h,color)`    | Fill a rectangle                     |
+| `bm_ui_width() / _height() / _bpp()`| Framebuffer geometry                 |
+| `fb_swap()`                         | Copy back-buffer → VRAM, YOFF flip   |
 
 ## Initialisation Flow — `init()`
 
@@ -201,6 +202,10 @@ init: struct copy 0x600 → fb
          ├── real_fb = fb.addr (VRAM physical address)
          └── fb_size = width * height * (bpp / 8)
 ```
+
+The screen console backend (text rendering) is **not** registered here. It
+is owned by the ui closure and must be wired up separately via `ui_init()`
+(see `docs/ui.md`).
 
 The check `fb.addr != 0xA0000` distinguishes VBE from VGA 13h. When VBE
 succeeded, the raw mode-info block is available at `0x10000` and is parsed

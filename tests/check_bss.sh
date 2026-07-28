@@ -2,7 +2,7 @@
 # Test: kernel memory layout — BSS must not overlap VGA legacy hole (0xA0000–0xBFFFF).
 set -e
 
-DIR=/home/radio/iexpos
+DIR=~/iexpos
 ELF=$DIR/build/kernel.elf
 
 if [ ! -f "$ELF" ]; then

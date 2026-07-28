@@ -1,6 +1,7 @@
 #include "baremetal.h"
 #include "demo.h"
 #include "gdb_stub.h"
+#include "ui.h"
 
 static void write_dec(int val);
 
@@ -8,6 +9,7 @@ void setup_main(void) {
     bm_puts("entry\n");
     bm_init();
     bm_puts("vga init done\n");
+    ui_init();            /* register screen backend with console */
 
     if (!arch_io_abort_check()) {
         bm_puts("WARNING: CPU does not support io abort (CR4 bit 24)\n");

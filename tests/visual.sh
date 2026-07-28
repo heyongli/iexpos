@@ -5,7 +5,7 @@
 # → parse PPM sample bytes → non-zero sum = framebuffer has content.
 set -e
 
-DIR=/home/radio/iexpos
+DIR=~/iexpos
 DISK=$DIR/build/vm-raw.img
 SER=/tmp/qemu-vm-serial
 SCR=/tmp/qemu-vm-screendump.ppm

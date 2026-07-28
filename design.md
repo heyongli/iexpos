@@ -4,6 +4,58 @@
 > project as a whole. Module-specific implementation details, debug flows,
 > and problem analysis belong in `docs/<module>.md`.
 
+## Closure Architecture
+
+The system is split into **autonomous software closures** (reusable,
+self-contained libraries with explicit dependencies and no horizontal peer
+coupling) and **the kernel main program** that wires them together.
+
+### Closures
+
+| Closure     | Role                                                     | Public header            |
+|-------------|----------------------------------------------------------|--------------------------|
+| `meta`      | Compile-time contracts (IO semantics, BIT/`_IO_OK`, etc.)| `meta/io.h`              |
+| `silx`      | Silicon-native primitives (framebuffer, serial, RTC, …)  | `kernel/include/baremetal.h` + `silx/<arch>/*.h` |
+| `gdb-stub`  | GDB remote serial protocol stub over COM1                | `gdb-stub/gdb_stub.h`, `gdb-stub/gdb_io.h` |
+| `ui`        | Font + text rendering + console screen backend + widgets | `ui/ui.h`                |
+
+### Main program — `kernel/`
+
+`kernel/` is **not** a closure — it is the host program that consumes the
+closures. It contains:
+
+- `setup_main` — the entry point the bootloader jumps to.
+- `console.c` — the timestamped text output abstraction (no own UI policy).
+
+The console abstraction is intentionally a kernel concern, not a closure:
+it is the single point that wires every closure's diagnostic output to one
+place.
+
+### Boot stage — `boot/`
+
+`boot/` is also not a closure — it is the 512-byte real-mode bootloader and
+the 16→32-bit PM switch stub. Separate from the kernel binary; linked first
+so the BIOS jump to `0x7E00` lands on `entry`. See `docs/bootloader.md`.
+
+### Dependency autonomy
+
+- Explicit dependency graph per closure; closed-loop internals; no peer deps.
+- Any closure lifts out of the tree and builds in a separate environment.
+
+### Hardware execution invariants (silx)
+
+- **Shortest-execution-time rule** — primitives run at bare-silicon speed.
+  No implicit pacing, unmanaged long loops, or thread-suspension logic.
+- **Busy waits are physical** — polling slow peripherals (UART, external
+  FIFO) makes a busy loop unavoidable.
+- **`io_abort` interlock (mandatory)** — every busy wait samples the per-CPU
+  abort flag via a 1-cycle privileged instruction (CR4 bit 24 on x86) and
+  breaks within microseconds when the host sets abort. **Every abort check
+  must print an identifying message** (via `bm_puts`) before exiting the spin
+  loop, so the developer can see which loop was interrupted and whether the
+  abort was early or late — without single-stepping in GDB. Details:
+  `docs/io-abort.md`.
+
 ## Overall Design Decisions
 
 ### Why bare metal?
@@ -59,18 +111,6 @@ BIOS → boot.asm (16-bit, VBE + disk) → entry.asm (PM switch) → kernel C
   around the VGA hole. See Core Principle below.
 - **All structures are packed** (`__attribute__((packed))`) to match
   hardware/VBE layouts.
-
-### IO Abort
-
-Busy-waiting loops (UART polling, GDB stub) need a way to be interrupted.
-The IO abort provides a **per-CPU flag** that any loop can check, and any
-other CPU or interrupt handler can set. Implementation details in
-`docs/io-abort.md`.
-
-**Every IO abort check point MUST print an identifying message** (via
-`bm_puts`) before exiting the spin loop. This ensures the developer can see
-exactly which loop was interrupted, and whether the abort happened early or
-late in the boot sequence — without having to single-step through GDB.
 
 ### Framebuffer / VGA
 

@@ -69,7 +69,7 @@ Breakpoint 1, setup_main () at kernel/setup.c:6
 |------|------|------|
 | `entry` | `0x7E00` | entry.asm 第一条指令 |
 | `setup_main` | kernel/setup.c | C 入口 (建议首断点) |
-| `bm_init` | bmX86/vga.c | PCI/VBE/VGA 初始化 |
+| `bm_init` | silx/x86/vga.c | PCI/VBE/VGA 初始化 |
 | `demo_orbit` | demos/orbit.c | orbit 动画入口 |
 
 ## 测试

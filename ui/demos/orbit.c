@@ -1,6 +1,6 @@
 #include "demo.h"
 #include "baremetal.h"
-#include "bmX86/io.h"   /* includes ../include/io.h for BIT, _IO_OK */
+#include "io.h"            /* BIT, _IO_OK from meta/io.h */
 
 static const int cos_tab[256] = {
   256,  255,  255,  255,  254,  254,  253,  252,

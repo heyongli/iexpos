@@ -1,13 +1,13 @@
 CC      = gcc
 LD      = ld
 AS      = nasm
-CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Iinclude -I bmX86 -I ui -I ui/demos -I kernel -I kernel/include -I gdb-stub
+CFLAGS  = -g -m32 -ffreestanding -fno-PIC -fno-asynchronous-unwind-tables -nostdlib -nostartfiles -I. -Imeta -I silx -I silx/x86 -I silx/x86/include -I ui -I ui/demos -I kernel -I kernel/include -I gdb-stub
 CFLAGS_DEBUG = $(CFLAGS) -DDEBUG
 LDFLAGS = -m elf_i386 -Ttext 0x7E00 -e entry --oformat binary -n
 LDFLAGS_ELF = -m elf_i386 -Ttext 0x7E00 -e entry -n
 BDIR    = build
 
-OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/rtc.o \
+OBJS = $(BDIR)/entry.o $(BDIR)/console.o $(BDIR)/ui.o $(BDIR)/text.o $(BDIR)/rtc.o \
         $(BDIR)/setup.o $(BDIR)/vga.o $(BDIR)/orbit.o $(BDIR)/progress.o $(BDIR)/gdb_stub.o $(BDIR)/gdb_io.o $(BDIR)/gdb_idt.o $(BDIR)/tramp.o $(BDIR)/serial.o $(BDIR)/uart.o $(BDIR)/io.o
 
 all: $(BDIR)/vm-raw.img $(BDIR)/kernel.elf
@@ -21,22 +21,22 @@ $(BDIR)/boot.bin: boot/boot.asm | $(BDIR)
 $(BDIR)/entry.o: boot/entry.asm | $(BDIR)
 	$(AS) -f elf32 $< -o $@
 
-$(BDIR)/vga.o: bmX86/vga.c bmX86/vga.h kernel/include/font_8x16.h kernel/console.h kernel/include/baremetal.h | $(BDIR)
+$(BDIR)/vga.o: silx/x86/vga.c silx/x86/vga.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/rtc.o: bmX86/rtc.c bmX86/rtc.h | $(BDIR)
+$(BDIR)/rtc.o: silx/x86/rtc.c silx/x86/rtc.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/uart.o: bmX86/uart.c bmX86/include/uart.h | $(BDIR)
+$(BDIR)/uart.o: silx/x86/uart.c silx/x86/include/uart.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/serial.o: bmX86/serial.c bmX86/include/serial_dev.h | $(BDIR)
+$(BDIR)/serial.o: silx/x86/serial.c silx/x86/include/serial_dev.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/io.o: bmX86/io.c bmX86/io.h | $(BDIR)
+$(BDIR)/io.o: silx/x86/io.c silx/x86/io.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h gdb-stub/gdb_stub.h | $(BDIR)
+$(BDIR)/setup.o: kernel/setup.c kernel/include/baremetal.h ui/demos/demo.h ui/ui.h gdb-stub/gdb_stub.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/gdb_stub.o: gdb-stub/gdb_stub.c gdb-stub/gdb_stub.h | $(BDIR)
@@ -54,7 +54,10 @@ $(BDIR)/tramp.o: gdb-stub/tramp.asm | $(BDIR)
 $(BDIR)/console.o: kernel/console.c kernel/console.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BDIR)/ui.o: ui/ui.c ui/ui.h kernel/include/baremetal.h | $(BDIR)
+$(BDIR)/ui.o: ui/ui.c ui/ui.h ui/font_8x16.h kernel/include/baremetal.h | $(BDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BDIR)/text.o: ui/text.c ui/ui.h ui/font_8x16.h kernel/console.h kernel/include/baremetal.h | $(BDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BDIR)/orbit.o: ui/demos/orbit.c ui/demos/demo.h kernel/include/baremetal.h | $(BDIR)

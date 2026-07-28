@@ -5,7 +5,7 @@
 # backtrace shows C frame, serial output completes normally.
 set -e
 
-DIR="${DIR:-/home/radio/iexpos}"
+DIR="${DIR:-$HOME/iexpos}"
 DISK="${DISK:-$DIR/build/vm-raw.img}"
 ELF="${ELF:-$DIR/build/kernel.elf}"
 TMP_OUT=/tmp/vm-gdb-output.txt

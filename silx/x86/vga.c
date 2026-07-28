@@ -1,6 +1,4 @@
 #include "vga.h"
-#include "font_8x16.h"
-#include "console.h"
 #include "baremetal.h"
 #include "io.h"
 #include "include/os_regs.h"
@@ -22,81 +20,6 @@ static volatile unsigned char *draw_buf;
 
 static void putpixel(int x, int y, unsigned int color);
 static void fill_rect(int x, int y, int w, int h, unsigned int color);
-static void draw_char(int x, int y, char c, unsigned int color);
-
-/* ---- screen backend (25×80 grid for console) ---- */
-
-#define SCR_ROWS 25
-#define SCR_COLS 80
-
-static char scr_grid[SCR_ROWS][SCR_COLS];
-static int scr_row;
-static int scr_col;
-
-static void scr_scroll(void) {
-    int i, j;
-    for (i = 0; i < SCR_ROWS - 1; i++)
-        for (j = 0; j < SCR_COLS; j++)
-            scr_grid[i][j] = scr_grid[i + 1][j];
-    for (j = 0; j < SCR_COLS; j++)
-        scr_grid[SCR_ROWS - 1][j] = ' ';
-    scr_row = SCR_ROWS - 1;
-}
-
-static void scr_be_write(const char *s, int len) {
-    int i;
-    for (i = 0; i < len; i++) {
-        char c = s[i];
-        if (c == '\n') {
-            scr_col = 0;
-            scr_row++;
-            if (scr_row >= SCR_ROWS)
-                scr_scroll();
-        } else if (c >= ' ') {
-            if (scr_col < SCR_COLS)
-                scr_grid[scr_row][scr_col++] = c;
-            if (scr_col >= SCR_COLS) {
-                scr_col = 0;
-                scr_row++;
-                if (scr_row >= SCR_ROWS)
-                    scr_scroll();
-            }
-        }
-    }
-}
-
-static void scr_be_flush(void) {
-    int i, j;
-    if (!fb.addr)
-        return;
-    for (i = 0; i <= scr_row; i++) {
-        int yy = 2 + i * FONT_HEIGHT;
-        if (yy + FONT_HEIGHT > fb.height)
-            break;
-        for (j = 0; j < SCR_COLS; j++) {
-            if (scr_grid[i][j])
-                draw_char(2 + j * FONT_WIDTH, yy, scr_grid[i][j], 0xFFFFFF);
-        }
-    }
-}
-
-static struct console_be scr_be = { scr_be_write, scr_be_flush };
-
-static void draw_char(int x, int y, char c, unsigned int color) {
-    int row, col;
-    unsigned char ch = (unsigned char)c;
-    if (ch < FONT_FIRST || ch > FONT_LAST)
-        ch = '?';
-    if (ch < FONT_FIRST)
-        return;
-    unsigned int idx = ch - FONT_FIRST;
-    for (row = 0; row < FONT_HEIGHT; row++) {
-        unsigned char bits = font8x16[idx][row];
-        for (col = 0; col < FONT_WIDTH; col++)
-            if (bits & (0x80 >> col))
-                putpixel(x + col, y + row, color);
-    }
-}
 
 /* ---- Port I/O ---- */
 
@@ -340,9 +263,9 @@ static void init(void) {
     bi->bpp    = fb.bpp;
     bi->addr   = (unsigned int)real_fb;
 
-    console_register_be(&scr_be);
-
-    /* Print status */
+    /* Print status. The screen backend (text rendering + console_be) is
+     * owned by ui/text.c and must be initialised by ui_init() after this
+     * returns. */
     bm_puts("vga init: ");
     bm_puts(mode_str);
     bm_puts(", ");
@@ -350,45 +273,12 @@ static void init(void) {
     bm_puts("\n");
 }
 
-static void draw_char_scaled(int x, int y, char c, unsigned int color, int sz) {
-    unsigned char ch = (unsigned char)c;
-    if (ch < FONT_FIRST || ch > FONT_LAST) ch = '?';
-    if (ch < FONT_FIRST) return;
-    unsigned int idx = ch - FONT_FIRST;
-    int row, col, dy, dx;
-    for (row = 0; row < FONT_HEIGHT; row++) {
-        unsigned char bits = font8x16[idx][row];
-        for (col = 0; col < FONT_WIDTH; col++) {
-            if (!(bits & (0x80 >> col)))
-                continue;
-            for (dy = 0; dy < sz; dy++)
-                for (dx = 0; dx < sz; dx++)
-                    putpixel(x + col * sz + dx, y + row * sz + dy, color);
-        }
-    }
-}
-
-/* ---- baremetal.h API ---- */
+/* ---- baremetal.h API (framebuffer primitives only) ---- */
 
 void bm_init(void) { init(); }
 int  bm_ui_ready(void) { return fb.addr ? _IO_OK : _NOT_READY; }
 void bm_ui_clear(unsigned int color) { clear(color); }
 void bm_ui_fill_rect(int x, int y, int w, int h, unsigned int color) { fill_rect(x, y, w, h, color); }
-void bm_ui_draw_char(int x, int y, unsigned char c, unsigned int fg, unsigned int bg) { (void)bg; draw_char(x, y, (char)c, fg); }
-void bm_ui_draw_str(int x, int y, const char *s, unsigned int fg, unsigned int bg) {
-    (void)bg;
-    while (*s) {
-        draw_char(x, y, *s++, fg);
-        x += FONT_WIDTH;
-    }
-}
-void bm_ui_draw_char_sz(int x, int y, unsigned char c, unsigned int fg, int sz) { draw_char_scaled(x, y, (char)c, fg, sz); }
-void bm_ui_draw_str_sz(int x, int y, const char *s, unsigned int fg, int sz) {
-    while (*s) {
-        draw_char_scaled(x, y, *s++, fg, sz);
-        x += FONT_WIDTH * sz;
-    }
-}
 int  bm_ui_width(void) { return fb.width; }
 int  bm_ui_height(void) { return fb.height; }
 int  bm_ui_bpp(void) { return fb.bpp; }

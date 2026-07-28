@@ -15,14 +15,10 @@ void bm_init(void);
 /* IO abort mechanism — check if CPU supports CR4 bit 24 */
 int arch_io_abort_check(void);
 
-/* bitmap UI — optional, safe to call even if no framebuffer */
+/* bitmap UI primitives — framebuffer ops; text rendering is in ui/ui.h */
 int  bm_ui_ready(void);
 void bm_ui_clear(unsigned int color);
 void bm_ui_fill_rect(int x, int y, int w, int h, unsigned int color);
-void bm_ui_draw_char(int x, int y, unsigned char c, unsigned int fg, unsigned int bg);
-void bm_ui_draw_str(int x, int y, const char *s, unsigned int fg, unsigned int bg);
-void bm_ui_draw_char_sz(int x, int y, unsigned char c, unsigned int fg, int sz);
-void bm_ui_draw_str_sz(int x, int y, const char *s, unsigned int fg, int sz);
 int  bm_ui_width(void);
 int  bm_ui_height(void);
 int  bm_ui_bpp(void);

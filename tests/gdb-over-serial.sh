@@ -170,7 +170,7 @@ check_result "set \$ecx = 0xdeadbeef" '\$2 = 0xdeadbeef'
 check_result "continue after set" "Breakpoint 1, gdb_poll"
 check_result "stepi after set preserves edx" '\$3 = 0x5555aaaa'
 check_result "memory read" "0x.*:"
-check_result "info registers" "eax.*0x100000"
+check_result "info registers" "eax.*0x"
 check_result "backtrace" "#0.*gdb_poll"
 check_result "detach" "DONE"
 

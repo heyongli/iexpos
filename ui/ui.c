@@ -30,9 +30,9 @@ static void draw_bar(void) {
     int pctx = bx + fw - pclen * cw - 4;
     int i;
     for (i = 0; i < pclen; i++)
-        bm_ui_draw_char_sz(pctx + 1 + i * cw, ty + 1, pbuf[i], 0x0f1729, tsz);
+        ui_draw_char_sz(pctx + 1 + i * cw, ty + 1, pbuf[i], 0x0f1729, tsz);
     for (i = 0; i < pclen; i++)
-        bm_ui_draw_char_sz(pctx + i * cw, ty, pbuf[i], TXT_C, tsz);
+        ui_draw_char_sz(pctx + i * cw, ty, pbuf[i], TXT_C, tsz);
     int infow = pctx - (bx + 4) - 4;
     if (infow > 0)
         bm_ui_fill_rect(bx + 4, ty + 1, infow + 1, ch + 1, BAR_C);
@@ -40,9 +40,9 @@ static void draw_bar(void) {
         int len = 0;
         while (cur_txt[len]) len++;
         for (i = 0; i < len; i++)
-            bm_ui_draw_char_sz(bx + 4 + 1 + i * cw, ty + 1, cur_txt[i], 0x0f1729, tsz);
+            ui_draw_char_sz(bx + 4 + 1 + i * cw, ty + 1, cur_txt[i], 0x0f1729, tsz);
         for (i = 0; i < len; i++)
-            bm_ui_draw_char_sz(bx + 4 + i * cw, ty, cur_txt[i], INF_C, tsz);
+            ui_draw_char_sz(bx + 4 + i * cw, ty, cur_txt[i], INF_C, tsz);
     }
 }
 

@@ -1,6 +1,6 @@
 #include "gdb_io.h"
-#include "bmX86/include/uart.h"
-#include "bmX86/include/os_regs.h"
+#include "uart.h"
+#include "os_regs.h"
 #include "io.h"
 
 void gdb_io_init(void) {

@@ -1,84 +1,103 @@
-# Kernel — kernel.c
+# Kernel — `kernel/`
 
 ## Purpose
 
-The C entry point for iexpos. Initialises the VGA driver, prints system
-information over serial, runs a graphics test (6 coloured rectangles), and
-then halts in an infinite loop.
+`kernel/` is the **host main program** — it is *not* a closure. It contains:
 
-## Entry Point
+- `setup_main` — the C entry point the bootloader jumps to after the PM
+  switch in `boot/entry.asm`.
+- `console.c` — the timestamped text-output abstraction that every
+  closure's diagnostic output is wired through.
 
-The kernel binary is loaded by the bootloader to `0x7E00`. The bootloader
-jumps to `0x7E00`, which must be the **first function** in the binary.
-`kernel_main` is placed first in the source file to guarantee this.
+The closures (`meta`, `silx`, `gdb-stub`, `ui`) are libraries the kernel
+links against. The kernel's job is to initialise them in the right order
+and feed the main loop. See `design.md` for the architecture overview.
 
-### GOTCHA: compiler reorders functions
+## Entry Point — `setup_main`
 
-Adding helper functions before `kernel_main` caused the compiler to place
-them first in `.text`. The bootloader's jump to `0x7E00` landed in the
-middle of a helper, producing a triple‑fault → CPU reset.
+`kernel/setup.c:setup_main` runs after `boot/entry.asm` sets up GDT / segments
+/ stack. It must be the **first** function in the kernel binary so the
+bootloader's jump to `0x7E00` lands on its first instruction.
 
-**Fix:** keep `kernel_main` as the first function in the source file, with
-forward declarations for any helpers.
+### GOTCHA — compiler reorders functions
 
-## Serial Debug Output
+Adding helper functions before `setup_main` caused the compiler to place them
+first in `.text`. The bootloader's jump to `0x7E00` landed in the middle of
+a helper, producing a triple-fault → CPU reset.
 
-Two static helpers provide text output over COM1 (port `0x3F8`).
-
-### `serial_print(const char *s)`
-
-Iterates over a null‑terminated string, sending each byte to the serial port
-using the `outb` instruction:
-
-```c
-__asm__ volatile("outb %0, %1"
-    : : "a"((unsigned char)*s), "Nd"((unsigned short)0x3F8));
-```
-
-The `Nd` constraint selects `outb %al, imm8` for ports < 256 and `outb %al,
-%dx` for larger ports (0x3F8 > 255, so DX is used).
-
-### `serial_print_dec(int val)`
-
-Converts an integer to its decimal string representation using a small
-on‑stack buffer (12 B), then passes the result to `serial_print`. The
-conversion uses repeated division‑by‑10, building the string from right to
-left.
+**Fix:** keep `setup_main` as the first function in `kernel/setup.c`, with
+forward declarations for any helpers above it.
 
 ## Initialisation Sequence
 
 ```
-kernel_main()
+setup_main()
   │
-  ├── vga.init()                   read fb_info from 0x600
-  │                                optionally refresh from VBE block
+  ├── bm_puts("entry")                  ← serial-only (works before fb)
   │
-  ├── serial_print("[KERNEL] ...") announce mode
+  ├── bm_init()              silx      detect mode, map framebuffer
+  ├── bm_puts("vga init done")
+  ├── ui_init()              ui        register screen backend with console
   │
-  ├── serial_print("WxHxB")        resolution (via vga.get_width/height)
+  ├── arch_io_abort_check()  silx      verify CR4 bit 24 usable
   │
-  ├── vga.clear(0x001020)          dark blue background
+  ├── gdb_stub_init()        gdb-stub  install INT1/INT3 handlers, IDT
+  ├── bm_puts("gdb stub init done")
+  ├── serial_rw_test()       gdb-stub  COM1 loopback sanity (writes SRW:P)
   │
-  ├── vga.fill_rect(…) × 6         draw coloured rectangles
+  ├── bm_ui_clear / bm_flush / fb_swap  clear screen
+  ├── bm_puts("gdb stub done")
   │
-  ├── serial_print("[KERNEL] ...") "Graphics test complete"
-  │
-  └── while (1) ;                  halt
+  └── while (1)
+        ├── demo_draw()      ui        orbit + progress bar
+        ├── fb_swap()        silx      copy back-buffer → VRAM, YOFF flip
+        └── gdb_poll()       gdb-stub  non-blocking poll for GDB packet
 ```
 
-## Graphics Test
+## Console — `kernel/console.c`
 
-Draws six 200 × 200 rectangles:
+`bm_puts` writes to all registered `console_be` backends and prepends a
+`HH:MM:SS` RTC timestamp at the start of every line.
 
-| X    | Y    | Colour    |
-|------|------|-----------|
-| 50   | 50   | Blue      |
-| 300  | 50   | Green     |
-| 550  | 50   | Red       |
-| 50   | 300  | Yellow    |
-| 300  | 300  | Cyan      |
-| 550  | 300  | Magenta   |
+```c
+struct console_be {
+    void (*write)(const char *s, int len);
+    void (*flush)(void);
+};
+void console_register_be(struct console_be *be);
+```
 
-All coordinates fit within both VGA 13h (320 × 200) and VBE 1024 × 768 modes.
-In VGA 13h the right‑most rectangles (X = 300, 550) are cut off or partially
-visible because 320 px is the limit.
+The serial backend is registered lazily inside `console_write` on first use.
+The screen backend (text rendering via font) is registered by `ui_init()`.
+
+Backends added after `console_register_be` has buffered output receive the
+buffer replay (see `console.c:console_register_be`), so init-order races are
+absorbed. A overflow marker (`~~(overflow)~~`) is replayed to backends
+attached after a buffer wrap.
+
+## Init Order — `ui_init()` After `bm_init()`
+
+`ui_init()` registers the screen backend (defined in `ui/text.c`) with the
+console. It must run **after** `bm_init()` so the framebuffer is ready for
+the first `bm_flush`, and **before** any `bm_puts` is meant to appear on the
+screen (output buffered between `bm_init` and `ui_init` is replayed).
+
+## Memory — `kernel/include/baremetal.h`
+
+The platform API contract consumed by `kernel/setup.c`, `ui/`, and demos.
+Implementation is split across closures:
+
+| Function              | Closure      |
+|-----------------------|--------------|
+| `bm_puts / bm_flush`  | `kernel`     |
+| `bm_rtc_*`            | `silx/x86`   |
+| `bm_init`             | `silx/x86`   |
+| `arch_io_abort_check` | `silx/x86`   |
+| `bm_ui_*` (rect ops)  | `silx/x86`   |
+| `fb_swap`             | `silx/x86`   |
+| `ui_*` (text rendering)| `ui`         |
+
+Text rendering (`ui_draw_char` / `ui_draw_str`) was deliberately moved out of
+`silx/x86` because it depends on the font (`ui/font_8x16.h`), which is a
+**ui** concern, not a hardware primitive. See `docs/ui.md` and
+`docs/bare-metal-interface.md`.

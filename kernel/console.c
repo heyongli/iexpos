@@ -1,6 +1,6 @@
 #include "console.h"
 #include "baremetal.h"
-#include "bmX86/include/serial_dev.h"
+#include "serial_dev.h"
 
 #define CON_BUF_SIZE 4096
 
