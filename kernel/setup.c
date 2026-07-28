@@ -2,6 +2,8 @@
 #include "demo.h"
 #include "gdb_stub.h"
 #include "ui.h"
+#include "silx/x86/io.h"
+#include "silx/x86/include/os_regs.h"
 
 static void write_dec(int val);
 
@@ -34,10 +36,16 @@ void setup_main(void) {
 
     bm_puts("gdb stub done\n");
 
+    unsigned int last_frame = pit_read();
+
     while (1) {
-        demo_draw();
-        fb_swap();
+        if (elapsed_pit(last_frame) > PIT_FRAME_TICKS) {
+            demo_draw();
+            fb_swap();
+            last_frame = pit_read();
+        }
         gdb_poll();
+        if (is_aborting()) return;
     }
 }
 

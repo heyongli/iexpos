@@ -8,6 +8,12 @@ section .text
 ; Each saves the full register context (matching struct regs layout
 ; in C) and forwards control to gdb_handler().
 ;
+; CRITICAL: bp_remove_all() is called BEFORE gdb_handler() to remove
+; ALL breakpoints (including any at gdb_handler's entry). This
+; prevents reentrancy — the handler entry is guaranteed to be free
+; of 0xCC. bp_insert_all() re-inserts breakpoints after the handler
+; returns.
+;
 ; Stack layout after CPU interrupt (low address → high):
 ;   pusha  → EDI, ESI, EBP, _ESP, EBX, EDX, ECX, EAX   (32 bytes)
 ;   manual → SS, GS, FS, ES, DS                         (20 bytes)
@@ -18,6 +24,9 @@ section .text
 ; ------------------------------------------------------------------
 
 extern gdb_handler
+extern gdb_handler_depth
+extern bp_remove_all
+extern bp_insert_all
 
 ; ---- INT1 (single-step / debug exception) ----------------------------
 ; Raised when EFLAGS.TF = 1 after each instruction.
@@ -30,10 +39,14 @@ int1_tramp:
     push fs
     push es
     push ds
+    inc dword [gdb_handler_depth]
+    call bp_remove_all
     mov eax, esp
     push eax
     call gdb_handler
     add esp, 4
+    call bp_insert_all
+    dec dword [gdb_handler_depth]
     pop ds
     pop es
     pop fs
@@ -53,10 +66,14 @@ int3_tramp:
     push fs
     push es
     push ds
+    inc dword [gdb_handler_depth]
+    call bp_remove_all
     mov eax, esp
     push eax
     call gdb_handler
     add esp, 4
+    call bp_insert_all
+    dec dword [gdb_handler_depth]
     pop ds
     pop es
     pop fs

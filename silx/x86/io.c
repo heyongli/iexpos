@@ -1,6 +1,6 @@
 #include "io.h"
 
-static unsigned short pit_read(void) {
+unsigned short pit_read(void) {
     __asm__ volatile("outb %0, %1" : : "a"((unsigned char)0x00), "Nd"((unsigned short)0x43));
     unsigned char low, high;
     __asm__ volatile("inb %1, %0" : "=a"(low) : "Nd"((unsigned short)0x40));

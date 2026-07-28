@@ -39,3 +39,47 @@ GDB (QEMU) debugging details: `docs/gdb-qemu.md`
 Debug serial port markers: `docs/serial.md`
 
 I/O port reference: `docs/io-ports.md`.
+
+## TODO
+
+### High Priority
+- [x] **GDB reentrancy** — fixed via `bp_remove_all()`/`bp_insert_all()` in trampoline
+- [ ] **PIT frame timing** — `elapsed_pit()` macro 16-bit wrap correctness, demo framerate limiter in `setup.c`
+- [ ] **Commit working tree** — gdb reentrancy, PIT timing, `is_aborting()` exit, gdb-over-serial test rewrite
+
+### Medium Priority
+- [ ] **io abort: cross-CPU** (see `design.md` CR4 bit 24 — per-CPU on Intel, needs IPI)
+- [ ] **Reorganise tests into closure dirs** (see `design.md` — per-closure tests → `<closure>/tests/`)
+- [ ] **Remove `mdelay(5)` from orbit.c** (already done in working tree, verify no regression)
+
+### Low Priority
+- [ ] **Check BSS after `gdb_in_handler`** — run `tests/check_bss.sh`
+- [ ] **Visual/flicker test** — verify no regression from framerate limiting
+
+## Debug Tips & Best Practices
+
+### Memory Map
+- **BSS must not cross 0xA0000** — `nm -n kernel.elf | tail -20` to verify end < 0xA0000
+- Large buffers (≥64 KB) → pointers in extended memory (≥0x100000), not static BSS
+- `fb_info` at 0x600–0x6FF (bootloader fills, kernel reads)
+
+### Compiler/Linker
+- **`setup_main` first function** in `kernel/setup.c`; helpers as forward declarations above it
+- `-nostdlib -ffreestanding -fno-PIC`, stack at 0x7C00
+- kernel.bin first 4 bytes = entry.asm (linked first)
+
+### GDB
+- QEMU: `make gdb-qemu` (T1) → `gdb -x tests/gdb-qemu.gdb` (T2)
+- Serial: `tests/gdb-over-serial.sh` — socat PTY + batch mode
+- Reentrancy guard: `gdb_in_handler` set in trampoline before calling `gdb_handler`; nested entry sets TF and IRETs out
+
+### IO
+- COM1 0x3F8, polling (no IRQ). LSR+5: bit 5=THRE, bit 6=TEMT
+- UART loopback: MCR bit 4=LOOP
+- PIT 1.193182 MHz: `PIT_FRAME_TICKS = 16 * (1193182 / 1000)` ≈ 19090
+- `elapsed_pit(start)` handles 16‑bit wrap via unsigned short subtraction
+
+### Code
+- Closures: self-contained, no peer coupling. Internal docs in `<closure>/docs/`
+- `kernel/` is host program (not a closure) — wires closures together
+- Console → COM1 + 25×80 buffer with RTC timestamp prefix

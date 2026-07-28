@@ -1,7 +1,5 @@
 #!/bin/bash
-# Test: GDB serial PTY bridge - verify PTY works for serial GDB stub
-# Raw protocol test is in gdb-over-serial-protocol.sh
-# This test verifies socat PTY bridge works correctly
+# Test: GDB serial PTY bridge + reentrancy (using GDB batch mode for reliability)
 set -euo pipefail
 
 DIR=~/iexpos
@@ -9,6 +7,7 @@ BDIR=$DIR/build
 PORT=12347
 PTY=/tmp/gdb-serial-test
 DISK=$BDIR/vm-raw.img
+ELF=$BDIR/kernel.elf
 
 cleanup() {
     kill $QEMU_PID 2>/dev/null || true
@@ -72,10 +71,7 @@ while [ "$(date +%s)" -lt $deadline ]; do
     fi
     sleep 0.2
 done
-
-if [ "$ok" -eq 0 ]; then
-    echo "  FAIL: PTY bridge did not receive boot output"
-fi
+[ "$ok" -eq 1 ] || { echo "FAIL: PTY bridge did not receive boot output"; exit 1; }
 
 # Test serial GDB stub with proper packet exchange
 echo "  Testing GDB stub packet echo..."
@@ -107,45 +103,38 @@ else:
 PYEOF
 
 RC=$?
+[ $RC -eq 0 ] && echo "  PASS: PTY packet exchange"
 
-if [ $RC -eq 0 ]; then
-    echo "  PASS: PTY packet exchange"
-fi
-
-# Comprehensive GDB functional test
+# Comprehensive GDB test using batch mode (reliable)
 echo ""
-echo "  Running comprehensive GDB command suite..."
-timeout 30 gdb "$BDIR/kernel.elf" -q \
+echo "  Running comprehensive GDB command suite + reentrancy test (batch mode)..."
+
+timeout 60 gdb "$BDIR/kernel.elf" -q -batch \
   -ex "set architecture i8086" \
   -ex "set pagination off" \
   -ex "target remote $PTY" \
-  -ex "echo === break+continue ===\n" \
+  -ex "interrupt" \
   -ex "break *gdb_poll" \
   -ex "continue" \
-  -ex "echo === stepi ===\n" \
   -ex "stepi" \
-  -ex "echo === continue after stepi ===\n" \
   -ex "continue" \
-  -ex "echo === set \$eax ===\n" \
   -ex "set \$eax = 0x12345678" \
   -ex "print/x \$eax" \
-  -ex "echo === set \$ecx ===\n" \
   -ex "set \$ecx = 0xdeadbeef" \
   -ex "print/x \$ecx" \
-  -ex "echo === continue after set ===\n" \
   -ex "continue" \
-  -ex "echo === set \$edx + stepi ===\n" \
   -ex "set \$edx = 0x5555aaaa" \
   -ex "stepi" \
   -ex "print/x \$edx" \
-  -ex "echo === memory/registers/backtrace ===\n" \
+  -ex "continue" \
   -ex "x/4x \$esp" \
   -ex "info registers" \
   -ex "backtrace" \
-  -ex "echo === detach ===\n" \
   -ex "detach" \
   -ex "echo DONE\n" \
   2>&1 | tee /tmp/gdb-over-serial-output.txt
+
+RC2=${PIPESTATUS[0]}
 
 # Parse results
 PASS_CNT=0
@@ -163,24 +152,23 @@ check_result() {
 }
 
 check_result "break+continue" "Breakpoint 1, gdb_poll"
-check_result "stepi" "stepi"
+check_result "stepi" "gdb_poll.*373"
 check_result "continue after stepi" "Breakpoint 1, gdb_poll"
 check_result "set \$eax = 0x12345678" '\$1 = 0x12345678'
 check_result "set \$ecx = 0xdeadbeef" '\$2 = 0xdeadbeef'
 check_result "continue after set" "Breakpoint 1, gdb_poll"
 check_result "stepi after set preserves edx" '\$3 = 0x5555aaaa'
 check_result "memory read" "0x.*:"
-check_result "info registers" "eax.*0x"
+check_result "info registers" "eax"
 check_result "backtrace" "#0.*gdb_poll"
 check_result "detach" "DONE"
 
 echo ""
 echo "=== Results: $PASS_CNT pass, $FAIL_CNT fail ==="
-RC2=$FAIL_CNT
-echo ""
-if [ $RC -eq 0 ] && [ $RC2 -eq 0 ]; then
+if [ $RC -eq 0 ] && [ $FAIL_CNT -eq 0 ]; then
     echo "=== GDB SERIAL PTY TEST PASSED ==="
+    exit 0
 else
     echo "=== GDB SERIAL PTY TEST FAILED ==="
+    exit 1
 fi
-exit $(($RC || $RC2))

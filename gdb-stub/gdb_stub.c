@@ -36,6 +36,9 @@ static volatile int gdb_pending_byte;
 static volatile int gdb_has_pending;
 static volatile int gdb_negotiated;
 
+/* reentrancy depth — incremented by trampoline before calling gdb_handler */
+volatile int gdb_handler_depth = 0;
+
 /* hex */
 static char hex(unsigned char v) {
     return v < 10 ? '0' + v : 'a' + v - 10;
@@ -129,21 +132,25 @@ static void unpack_regs(const char *hex_str, struct regs *r) {
     }
 }
 
-static void bp_remove_all(void) {
+/* Remove all breakpoints: restore original bytes but keep active flag.
+   Called from trampoline BEFORE entering gdb_handler to prevent reentrancy. */
+void bp_remove_all(void) {
     for (int i = 0; i < BP_TABLE_SIZE; i++)
-        if (bp_table[i].active) {
+        if (bp_table[i].active)
             *((volatile unsigned char *)bp_table[i].addr) = bp_table[i].saved;
-            bp_table[i].active = 0;
-        }
 }
 
-static void bp_insert_all(void) {
+/* Re-insert all breakpoints: write 0xCC for active entries.
+   Called from trampoline AFTER gdb_handler returns. */
+void bp_insert_all(void) {
     for (int i = 0; i < BP_TABLE_SIZE; i++)
         if (bp_table[i].active)
             *((volatile unsigned char *)bp_table[i].addr) = 0xCC;
 }
 
-/* C stub handler — called from asm trampoline */
+/* C stub handler — called from asm trampoline.
+   All breakpoints have been removed by bp_remove_all() before this call,
+   so the handler entry is safe from reentrancy. */
 void gdb_handler(struct regs *r) {
     /* Adjust EIP for INT3 from 0xCC breakpoint: CPU pushed EIP past
        the 0xCC byte, so back up by 1 to re-execute the original instruction.
