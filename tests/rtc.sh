@@ -1,9 +1,46 @@
 #!/bin/bash
-# Test: RTC time read
-# Verifies RTC can read time by checking for timestamp output
+# RTC (Real Time Clock) Time Read Verification Test
+# ===================================================
+#
+# Verifies that the RTC can read time by checking for timestamp
+# output in the format HH:MM:SS.
+#
+# Background
+# ----------
+# The kernel initializes the RTC during boot and uses it to provide timestamps
+# in the console output. This test verifies that the RTC is functioning and
+# producing valid time values.
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial output to file
+# 2. Capture all output during demo execution
+# 3. Check for timestamp pattern (HH:MM:SS) in the output
+#
+# Expected Results
+# ----------------
+# - Output must contain valid timestamp in format HH:MM:SS
+# - Hours: 00-23, Minutes: 00-59, Seconds: 00-59
+# - Output must show "PASS: RTC timestamp format valid"
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires kernel with RTC initialization
+# - Uses -serial file: for output capture
+#
+# Usage
+# -----
+#     ./tests/rtc.sh              # Build and run test
+#     ./tests/rtc.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if valid timestamp found
+# - Returns 1 if timestamp not found or invalid format
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-rtc.txt
 

@@ -1,8 +1,35 @@
 #!/bin/bash
-# Runner: executes all test suites in tests/
+# Main Test Suite Runner for iexpos kernel
+# =========================================
+#
+# Executes all test suites in tests/ directory. Each test has its own
+# documentation — run 'head -40 tests/<name>.sh' for details.
+#
+# Test Method
+# -----------
+# - Each test is a standalone script in tests/ directory
+# - Tests run in isolation — failure in one test does NOT stop others
+# - Use --no-build flag to skip kernel rebuild (for faster re-runs)
+# - All tests use QEMU with KVM acceleration
+#
+# Environment
+# -----------
+# - QEMU with KVM support
+# - Development tools: make, gcc, nasm, ld
+# - GDB, socat, Python 3
+#
+# Usage
+# -----
+#     ./test.sh                    # Build kernel and run all tests
+#     ./test.sh --no-build         # Run tests without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if ALL tests pass
+# - Returns 1 if ANY test fails
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 
 echo "============================================"
 echo "  Building kernel"

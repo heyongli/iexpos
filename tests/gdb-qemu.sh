@@ -1,11 +1,53 @@
 #!/bin/bash
-# Test: GDB single-step through C entry, verify symbols and stepping work
-# QEMU -gdb tcp::1234 -S (frozen) → GDB batch: hbreak setup_main, continue,
-# backtrace, step, continue. Verifies: hit breakpoint, symbol resolved,
-# backtrace shows C frame, serial output completes normally.
+# GDB Single-Step Debugging Verification Test
+# ==============================================
+#
+# Verifies that GDB debugging via QEMU GDB stub works correctly,
+# including breakpoint setting, symbol resolution, single-stepping, and
+# backtrace functionality.
+#
+# Background
+# ----------
+# QEMU provides a GDB stub that allows debugging the kernel via GDB over TCP.
+# This test verifies that the GDB stub is functional and that basic debugging
+# operations (breakpoint, continue, step, backtrace) work correctly.
+#
+# Test Method
+# -----------
+# 1. Build kernel with debug symbols
+# 2. Start QEMU with -gdb tcp::1234 -S (frozen at start)
+# 3. Connect GDB and set hardware breakpoint at setup_main
+# 4. Continue to breakpoint, verify symbol resolution
+# 5. Step into function, verify backtrace
+# 6. Continue to completion, verify serial output
+#
+# Expected Results
+# ----------------
+# - ELF must have debug info (.debug_info section)
+# - GDB must hit breakpoint at setup_main
+# - Symbol must resolve to correct function
+# - Backtrace must show setup_main in call stack
+# - Serial output must complete normally
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires GDB installed
+# - Requires kernel with debug symbols
+# - Uses GDB batch mode for automation
+#
+# Usage
+# -----
+#     ./tests/gdb-qemu.sh              # Build and run test
+#     ./tests/gdb-qemu.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all GDB operations succeed
+# - Returns 1 if any GDB operation fails
 set -e
 
-DIR="${DIR:-$HOME/iexpos}"
+DIR=$(pwd)
 DISK="${DISK:-$DIR/build/vm-raw.img}"
 ELF="${ELF:-$DIR/build/kernel.elf}"
 TMP_OUT=/tmp/vm-gdb-output.txt

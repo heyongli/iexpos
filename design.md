@@ -180,8 +180,14 @@ defaults. This has caused multiple bugs in this project.
 - Large buffers (framebuffer backbuffers, ≥ 64 KB) must be allocated from
   extended memory (≥ 0x100000), not from BSS.
 - Manual check: `nm -n kernel.elf | tail -20` to verify BSS end < 0xA0000.
-- For any new static buffer ≥ 64 KB, compute `&buf + sizeof(buf)` and confirm
+- For any new static buffer ≥ 64 KB, compute `&buf + sizeof(buf)` and confirm
   it does not intersect 0xA0000–0xBFFFF.
+
+## Testing
+
+Test cases are documented in `tests/README.md`. When adding new tests,
+follow the conventions described there (header format, path rules, output
+format, cleanup, etc.).
 
 ## TODOs
 

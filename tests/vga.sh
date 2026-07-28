@@ -1,9 +1,49 @@
 #!/bin/bash
-# Test: VGA/VBE initialization
-# Verifies framebuffer is initialized with valid resolution
+# VGA/VBE Initialization Verification Test
+# ===========================================
+#
+# Verifies that the VGA/VBE framebuffer is initialized with valid
+# resolution parameters (width, height, bits per pixel).
+#
+# Background
+# ----------
+# The kernel initializes VGA/VBE graphics mode during boot. The resolution
+# and color depth must be valid positive integers for the graphics subsystem
+# to function correctly.
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial output to file
+# 2. Capture serial output containing resolution information
+# 3. Parse "Resolution: WIDTHxHEIGHTxBPP" line
+# 4. Validate that width, height, and bpp are all positive integers
+#
+# Expected Results
+# ----------------
+# - Resolution line must be found in output
+# - Width must be > 0 (typically 1024)
+# - Height must be > 0 (typically 768)
+# - BPP must be > 0 (typically 32)
+# - Output must show "PASS: all checks passed"
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires kernel with VGA/VBE initialization
+# - Uses -serial file: for output capture
+#
+# Usage
+# -----
+#     ./tests/vga.sh              # Build and run test
+#     ./tests/vga.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all resolution values are valid
+# - Returns 1 if resolution not found or any value is invalid
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-vga.txt
 

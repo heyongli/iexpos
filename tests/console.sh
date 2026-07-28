@@ -1,9 +1,54 @@
 #!/bin/bash
-# Test: Console output functionality
-# Verifies bm_puts works for various outputs
+# Console Output Verification Test
+# ==================================
+#
+# Verifies that the console output (bm_puts) functionality works
+# correctly for various output messages during kernel initialization.
+#
+# Background
+# ----------
+# The kernel uses a console subsystem that outputs messages to both serial port
+# and framebuffer. This test verifies that the console initialization markers
+# are properly output during boot.
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial output to file
+# 2. Capture all console output during initialization
+# 3. Check for specific console markers in the output
+#
+# Expected Patterns
+# -----------------
+# - "entry" - C kernel main function started
+# - "vga init done" - VGA initialization completed
+# - "Graphics init OK" - Graphics subsystem initialized
+# - "gdb stub init done" - GDB stub initialization started
+# - "gdb stub done" - GDB stub initialization completed
+# - "Graphics test complete" - Demo ran to completion
+#
+# Expected Results
+# ----------------
+# - All 6 patterns must be found in serial output
+# - Output must show "PASS: all checks passed"
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires kernel with console debug output enabled
+# - Uses -serial file: for output capture
+#
+# Usage
+# -----
+#     ./tests/console.sh              # Build and run test
+#     ./tests/console.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all patterns found
+# - Returns 1 if any pattern missing
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-console.txt
 

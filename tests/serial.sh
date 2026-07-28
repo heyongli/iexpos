@@ -1,10 +1,53 @@
 #!/bin/bash
-# Test: serial output contains expected boot markers
-# Checks: PMOK (boot PM switch), entry (C main), Graphics init OK (console),
-#         Resolution detected, Graphics test complete (full demo ran to end)
+# Serial Output Verification Test
+# ================================
+#
+# Verifies that the serial port outputs expected boot markers
+# during kernel initialization and demo execution.
+#
+# Background
+# ----------
+# The kernel uses serial port (COM1) for debug output. During boot and
+# execution, it outputs specific markers that indicate successful
+# initialization of various subsystems.
+#
+# Test Method
+# -----------
+# 1. Boot kernel in QEMU with serial output to console
+# 2. Capture all serial output during boot and demo execution
+# 3. Check for specific pattern markers in the output
+#
+# Expected Patterns
+# -----------------
+# - "PMOK" - Bootloader PM switch successful
+# - "entry" - C kernel main function started
+# - "Graphics init OK" - Console subsystem initialized
+# - "Resolution: [0-9]*x[0-9]*x[0-9]" - VGA/VBE resolution detected
+# - "Graphics test complete" - Demo ran to completion
+#
+# Expected Results
+# ----------------
+# - All 5 patterns must be found in serial output
+# - Output must show "PASS: all checks passed"
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires kernel built with serial debug output enabled
+# - Uses -nographic mode for serial output capture
+#
+# Usage
+# -----
+#     ./tests/serial.sh              # Build and run test
+#     ./tests/serial.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all patterns found
+# - Returns 1 if any pattern missing
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-test-output.txt
 

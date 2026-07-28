@@ -15,7 +15,7 @@
 #
 set -euo pipefail
 
-DIR=~/iexpos
+DIR=$(pwd)
 BDIR=$DIR/build
 DISK=$BDIR/vm-raw.img
 SERIAL_PORT=12348

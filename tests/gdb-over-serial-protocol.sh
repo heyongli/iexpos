@@ -1,7 +1,54 @@
 #!/bin/bash
-# Test: GDB serial protocol correctness over raw TCP.
-# Sends GDB remote protocol packets directly and verifies responses.
-set -euo pipefail
+# GDB Serial Protocol Verification Test
+# ======================================
+#
+# Verifies that the GDB remote serial protocol works correctly
+# over raw TCP, testing all essential protocol packets.
+#
+# Background
+# ----------
+# The kernel implements a GDB stub that speaks the GDB remote serial protocol
+# over a TCP socket. This test sends raw protocol packets and verifies the
+# stub responds correctly to each command.
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial on TCP port
+# 2. Wait for boot output ("Graphics test complete")
+# 3. Send raw GDB protocol packets and verify responses:
+#    - ? -> S05 (stop reply)
+#    - vMustReplyEmpty -> OK
+#    - qSupported -> PacketSize=...
+#    - g -> 128 hex chars (register read)
+#    - m7e00,10 -> 32 hex chars (memory read)
+#    - P0=... -> OK (register write)
+#    - g -> verify EAX changed after P
+#    - M -> OK (memory write)
+#    - m10000,4 -> deadbeef (read back)
+#    - c -> ACK (continue)
+#
+# Expected Results
+# ----------------
+# - All 11 protocol tests must pass
+# - Each packet must receive correct response
+# - No protocol errors or timeouts
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires Python 3 for socket communication
+# - Uses raw TCP socket for GDB protocol
+#
+# Usage
+# -----
+#     ./tests/gdb-over-serial-protocol.sh              # Build and run
+#     ./tests/gdb-over-serial-protocol.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all 11 protocol tests pass
+# - Returns 1 if any protocol test fails
+set -e
 cd "$(dirname "$0")/.."
 
 BDIR=build
@@ -95,7 +142,6 @@ except: pass
 s.settimeout(15)
 
 # ---- Test 1: ? query → S05 stop reply ----
-# The first ? enters handler from poll (gdb_from_poll=1), S05 is sent.
 resp = send_recv(s, pkt("?"))
 p = parse_pkt(resp)
 if 'S05' in p:

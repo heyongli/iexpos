@@ -1,40 +1,221 @@
 # Test Cases
 
-## Test Structure
+## Requirements
 
-| Test | Purpose | Method |
-|------|---------|--------|
-| `serial.sh` | Boot serial output markers | QEMU `-serial file:` + grep |
-| `serial-rw.sh` | UART loopback read/write | QEMU `-serial file:` + grep `SRW:P` |
-| `console.sh` | Console output (bm_puts) | QEMU `-serial file:` + grep markers |
-| `vga.sh` | VGA/VBE resolution detection | QEMU `-serial file:` + grep `Resolution:` |
-| `visual.sh` | Framebuffer has visible pixels | QEMU screendump + PPM pixel sum |
-| `rtc.sh` | RTC time read | QEMU `-serial file:` + grep timestamp |
-| `io-abort.sh` | IO abort mechanism (CR4 bit 24) | QEMU `-serial file:` + grep warning |
-| `gdb-qemu.sh` | Real GDB debugging via QEMU `-gdb` | GDB batch: break, step, backtrace |
-| `gdb-over-serial-protocol.sh` | GDB serial protocol correctness (raw TCP) | Python: trigger, negotiate, `c`/`s`/regs/mem over TCP |
-| `gdb-over-serial.sh` | Real GDB debugging via serial PTY bridge | socat PTY + GDB batch: break, step, set, continue, backtrace, detach |
+### 1. Header Documentation
 
-## Test Purpose Distinction
-
-- `gdb-over-serial-protocol.sh` — Python test that sends GDB remote serial packets directly over TCP to QEMU serial. Verifies the stub parses packets correctly (`?`, `g`, `G`, `m`, `M`, `c`, `P`, `vMustReplyEmpty`, `qSupported`), validates checksums, and sends correct replies. This test is protocol-focused and runs without real GDB.
-
-- `gdb-over-serial.sh` — Tests the full stack: QEMU serial → TCP → socat PTY bridge → real GDB. Verifies that a real GDB client can connect, negotiate, set breakpoints, stepi, modify registers (`set \$reg`), continue, backtrace, and detach through the serial stub. Requires socat.
-
-## Status
-
-GDB-over-serial debugging works: connect → `break *gdb_poll` → `continue` hits breakpoint → `backtrace` shows frame. See `gdb-stub/` for the stub implementation and `gdb-stub/tramp.asm` for interrupt trampolines.
-
-## Running
+Every test script must have a header comment:
 
 ```bash
-./test.sh              # Run all tests
-tests/serial.sh        # Run single test (--no-build to skip rebuild)
+#!/bin/bash
+# Test Name
+# =========
+#
+# Summary: One-line description of what the test verifies.
+#
+# Background
+# ----------
+# Why this test is needed and relevant technical background.
+#
+# Method
+# ------
+# 1. Specific step 1
+# 2. Specific step 2
+#
+# Expected Results
+# ----------------
+# - Expected output pattern 1
+# - Expected output pattern 2
+#
+# Environment
+# -----------
+# - Required tools and dependencies
+#
+# Usage
+# -----
+#     ./tests/xxx.sh              # Build and run
+#     ./tests/xxx.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 on success
+# - Returns 1 on failure
 ```
 
-## Notes
+### 2. Path Convention
 
-- All tests use `-drive file=...,format=raw` for QEMU
-- `gdb-qemu.sh` and `gdb-over-serial.sh` require GDB installed
-- `gdb-over-serial.sh` requires socat installed
-- `gdb-over-serial-protocol.sh` uses direct TCP connection (no PTY), no external dependencies
+**No absolute paths allowed.** Use `$(pwd)` instead:
+
+```bash
+# Wrong
+DIR=~/iexpos
+
+# Correct
+DIR=$(pwd)
+```
+
+### 3. Temporary Files
+
+Use `/tmp/` prefix with `TMP_` variable names:
+
+```bash
+TMP_OUT=/tmp/vm-xxx.txt
+```
+
+Clean up after test completes:
+
+```bash
+rm -f $TMP_OUT
+```
+
+### 4. QEMU Mode
+
+Serial output tests use `-nographic` + `-serial file:`:
+
+```bash
+qemu-system-x86_64 \
+    -enable-kvm -m 2G -nographic -smp 2 -vga std \
+    -drive file=$DISK,format=raw \
+    -net none \
+    -serial file:$TMP_OUT \
+    -monitor none
+```
+
+GDB tests use `-serial tcp::`:
+
+```bash
+qemu-system-x86_64 \
+    -enable-kvm -m 2G -nographic -smp 2 -vga std \
+    -drive file=$DISK,format=raw \
+    -net none \
+    -serial tcp::"$PORT",server,nowait
+```
+
+### 5. Check Function
+
+Use a unified `check` function:
+
+```bash
+check() {
+    local label="$1"
+    local pattern="$2"
+    if grep -q "$pattern" $TMP_OUT; then
+        echo "  PASS: $label"
+        PASS=$((PASS + 1))
+    else
+        echo "  FAIL: $label (expected '$pattern')"
+        FAIL=$((FAIL + 1))
+    fi
+}
+```
+
+### 6. Avoid Hardcoded Output Strings
+
+Test cases should **not depend on specific serial output text**.
+Output strings change frequently during development, causing tests to break.
+
+**Preferred approach**: Test mechanisms, not content.
+
+```bash
+# Wrong: depends on specific text
+check "Graphics init OK" "Graphics init OK"
+
+# Correct: test that serial works and receives valid output
+check "Serial has output" '[^[:space:]]'
+```
+
+**Examples of good tests**:
+- Serial port can send/receive data
+- We receive ANY valid output (not specific text)
+- Output matches expected format (timestamp, protocol)
+- Kernel symbols exist in ELF (`nm kernel.elf | grep xxx`)
+- Memory layout is valid (BSS address ranges)
+
+**Examples of bad tests**:
+- Specific strings like "Graphics init OK"
+- Specific error messages
+- Output that may change between versions
+
+When testing serial output, use Python to extract **structural information**:
+
+```python
+def check_serial_output(path):
+    """Validate serial output structure, not content."""
+    with open(path) as f:
+        lines = f.readlines()
+    
+    checks = {
+        'has_output': len(lines) > 0,
+        'non_empty_lines': any(l.strip() for l in lines),
+        'has_timestamp': any(re.match(r'\d{2}:\d{2}:\d{2}', l) for l in lines),
+    }
+    return checks
+```
+
+For kernel functionality, prefer testing via:
+- Symbol table: `nm kernel.elf | grep xxx`
+- Memory layout: `nm -n kernel.elf` address ranges
+- Protocol responses (GDB, serial read/write)
+
+### 6. Output Format
+
+- Start: `=== Test Name ===`
+- Check: `  PASS: description` or `  FAIL: description`
+- Summary: `=== Results: X passed, Y failed ===`
+- Result: `=== TEST PASSED ===` or `=== TEST FAILED ===`
+
+### 7. Exit Code
+
+```bash
+if [ "$PASS" -gt 0 ] && [ "$FAIL" -eq 0 ]; then
+    echo "=== TEST PASSED ==="
+    exit 0
+else
+    echo "=== TEST FAILED ==="
+    exit 1
+fi
+```
+
+### 8. --no-build Parameter
+
+Support `--no-build` to skip build:
+
+```bash
+if [ "$1" != "--no-build" ]; then
+    echo "=== Building ==="
+    make -C $DIR clean all 2>&1 | tail -3
+fi
+```
+
+### 9. Cleanup Function
+
+Use trap to ensure cleanup:
+
+```bash
+cleanup() {
+    kill $QEMU_PID 2>/dev/null || true
+    rm -f $TMP_OUT
+    fuser -k "$PORT"/tcp 2>/dev/null || true
+}
+trap cleanup EXIT
+```
+
+### 10. Python Utility Scripts
+
+Python utilities in `tests/` directory should:
+- Have a module-level docstring
+- Define a `main()` function
+- Include `if __name__ == "__main__": main()`
+
+## Running Tests
+
+```bash
+# Run all tests
+./test.sh
+
+# Run single test
+./tests/serial.sh
+
+# Run without rebuild
+./tests/serial.sh --no-build
+```

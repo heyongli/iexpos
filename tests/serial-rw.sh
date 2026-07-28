@@ -1,10 +1,47 @@
 #!/bin/bash
-# Test: serial port loopback read/write via serial_rw_test()
-# Kernel writes 4 known bytes to THR in loopback, reads back from RBR,
-# compares, outputs SRW:P/F. Script greps for SRW:P.
+# Serial Port Loopback Read/Write Test
+# ======================================
+#
+# Verifies that the serial port (UART) loopback functionality works
+# correctly for both transmit (THR) and receive (RBR) operations.
+#
+# Background
+# ----------
+# The serial port test uses UART loopback mode (MCR bit 4) where transmitted
+# data is immediately received back. This verifies that the UART hardware and
+# driver are functioning correctly without requiring a second serial port.
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial output to file
+# 2. Kernel writes 4 known bytes to THR in loopback mode
+# 3. Kernel reads back from RBR and compares
+# 4. Kernel outputs "SRW:P" (pass) or "SRW:F" (fail)
+# 5. Test script greps for "SRW:P" in the output
+#
+# Expected Results
+# ----------------
+# - Output must contain "SRW:P" indicating successful loopback
+# - All 4 bytes must match between write and read
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires kernel with UART loopback test enabled
+# - Uses -serial file: for output capture
+#
+# Usage
+# -----
+#     ./tests/serial-rw.sh              # Build and run test
+#     ./tests/serial-rw.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if loopback test passes ("SRW:P" found)
+# - Returns 1 if loopback test fails or pattern not found
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 TMP_OUT=/tmp/vm-serial-rw.txt
 

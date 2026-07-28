@@ -1,9 +1,49 @@
 #!/usr/bin/env python3
-"""Analyse a QEMU PPM screendump for known visual defects.
+"""
+QEMU PPM Screendump Analysis
+=============================
 
-Usage:
-  python3 check_screendump.py <file.ppm>   # check a single dump
-  python3 check_screendump.py --live       # boot VM, capture dump, check it
+Analyses a QEMU PPM screendump for known visual defects in the
+iexpos kernel's framebuffer output.
+
+Summary
+-------
+Loads a PPM image captured from QEMU's screendump command and runs
+a series of pixel-based checks to verify the graphics subsystem
+is producing correct output.
+
+Checks Performed
+----------------
+1. white_bar:    No full-width white bar at character row 10
+2. text_present: At least 3 rows of visible text in top area
+3. background:   Background colour (0x0f1729) is consistent
+4. progress_bar: Progress bar area at bottom has visible content
+5. orbit:        Orbit animation squares visible near centre
+
+Background
+----------
+The kernel runs a graphics demo that produces text output, orbit
+animation squares, and a progress bar. This tool verifies these
+visual elements are present and correct.
+
+Usage
+-----
+    python3 check_screendump.py <file.ppm>   # check a single dump
+    python3 check_screendump.py --live       # boot VM, capture dump, check it
+
+Environment
+-----------
+    Requires QEMU with screendump support for --live mode.
+
+Expected Output
+---------------
+    On success: "ALL CHECKS PASSED"
+    On failure: "FAILURES:" followed by list of issues
+
+Exit Status
+-----------
+    Returns 0 if all checks pass.
+    Returns 1 if any check fails.
 """
 
 import sys, os, struct, subprocess, time, tempfile

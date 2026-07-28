@@ -1,8 +1,44 @@
 #!/bin/bash
-# Test: kernel memory layout — BSS must not overlap VGA legacy hole (0xA0000–0xBFFFF).
+# Kernel Memory Layout Test - BSS Segment Verification
+# =====================================================
+#
+# Verifies that the kernel's BSS (Block Started by Symbol) segment
+# does not overlap with the VGA legacy memory hole (0xA0000-0xBFFFF).
+#
+# Background
+# ----------
+# In x86 real mode, the VGA graphics memory is mapped to 0xA0000-0xBFFFF.
+# If the kernel's BSS segment overlaps this region, data written to BSS would
+# corrupt VGA memory, causing display artifacts or system crashes.
+#
+# Test Method
+# -----------
+# 1. Extract BSS start and end addresses from kernel.elf using nm
+# 2. Check if BSS range overlaps VGA hole (0xA0000-0xBFFFF)
+# 3. Specifically verify draw_buf pointer is not in VGA hole
+#
+# Expected Results
+# ----------------
+# - BSS must be entirely below 0xA0000 or entirely above 0xBFFFF
+# - draw_buf address must not be in VGA hole range
+# - Output must show "PASS: memory layout is safe"
+#
+# Environment
+# -----------
+# - Requires kernel.elf to be built first (make)
+# - Uses nm to extract symbol addresses from ELF
+#
+# Usage
+# -----
+#     ./tests/check_bss.sh
+#
+# Exit Status
+# -----------
+# - Returns 0 if memory layout is safe (no overlap)
+# - Returns 1 if BSS overlaps VGA hole or draw_buf is in VGA hole
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 ELF=$DIR/build/kernel.elf
 
 if [ ! -f "$ELF" ]; then

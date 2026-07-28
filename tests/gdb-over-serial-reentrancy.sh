@@ -1,30 +1,54 @@
 #!/bin/bash
-# Test: GDB reentrancy guard - breakpoint inside gdb_handler
+# GDB Reentrancy Guard Verification Test
+# ========================================
 #
-# ## Test Method
-# 1. Boot kernel in QEMU with serial on TCP port.
-# 2. Wait for "Graphics test complete" (kernel boot done).
-# 3. Look up gdb_handler address from kernel symbols (nm).
-# 4. Raw socket GDB protocol:
-#    a. Send "?"  → expect "$S05#..."  (handler starts clean)
-#    b. Send "Z0,<addr>,1" → expect "$OK#..."  (set bp at handler entry)
-#    c. Send "c"  → expect "+" (continue, which triggers reentry)
-#    d. Send "?"  → expect "$S05#..."  (reentry survived)
-#    e. Send "g"  → expect 128 hex chars (registers readable)
-#    f. Send "c;?" → expect "$S05#..."  (responsive after 2nd continue)
+# Verifies that the GDB reentrancy guard works correctly when
+# a breakpoint is set at the gdb_handler entry point, preventing nested
+# breakpoints from causing infinite loops.
 #
-# ## Expected Results
-# - All 7 checks pass (1 boot + 6 protocol steps).
-# - The critical check is #4 (c → breakpoint → ? → S05): if the
-#   reentrancy guard fails, the kernel hangs and this step returns empty.
-# - `stepi` via GDB batch is NOT tested here because GDB has different
-#   protocol behavior; stepi coverage is in gdb-over-serial.sh.
+# Background
+# ----------
+# When the GDB stub processes a packet, it sets gdb_in_handler=1 before
+# calling gdb_handler. If a breakpoint is set at gdb_handler entry, the
+# INT3 interrupt triggers re-entry. The reentrancy guard detects this and
+# sets TF (trap flag) to single-step out of the nested handler.
 #
-# ## Reference
-# See docs/gdb-over-serial-reentrancy.md for design and root cause analysis.
+# Test Method
+# -----------
+# 1. Boot kernel with serial on TCP port
+# 2. Get gdb_handler address from kernel symbols (nm)
+# 3. Raw socket GDB protocol:
+#    a. Send "?" -> expect S05 (clean handler start)
+#    b. Send "Z0,<addr>,1" -> expect OK (set bp at handler)
+#    c. Send "c" -> expect ACK (continue, triggers reentry)
+#    d. Send "?" -> expect S05 (reentry survived)
+#    e. Send "g" -> expect 128 hex chars (registers readable)
+#    f. Send "c;?" -> expect S05 (responsive after 2nd continue)
+#
+# Expected Results
+# ----------------
+# - All 7 checks must pass (1 boot + 6 protocol steps)
+# - Critical check: "?" after breakpoint -> S05 (reentrancy guard works)
+# - If guard fails, kernel hangs and returns empty
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires Python 3 for socket communication
+# - Uses raw TCP socket for GDB protocol
+#
+# Usage
+# -----
+#     ./tests/gdb-over-serial-reentrancy.sh              # Build and run
+#     ./tests/gdb-over-serial-reentrancy.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if all 7 checks pass
+# - Returns 1 if any check fails (reentrancy guard broken)
 set -euo pipefail
 
-DIR=$(cd "$(dirname "$0")/.." && pwd)
+DIR=$(pwd)
 BDIR=$DIR/build
 PORT=12350
 DISK=$BDIR/vm-raw.img
@@ -141,7 +165,6 @@ else:
     print(f"FAIL: ? got '{p}'")
 
 # ---- Test 2: Set breakpoint at gdb_handler (Z0) ----
-# Z0,<addr>,1 sets a software breakpoint
 bp_addr = int('$GDB_HANDLER_ADDR', 16)
 bp_cmd = f"Z0,{bp_addr:x},1"
 resp = send_recv(s, pkt(bp_cmd))
@@ -164,11 +187,8 @@ else:
 time.sleep(0.3)
 
 # ---- Test 4: Send ? again → triggers gdb_poll → int3 → gdb_handler (0xCC!) ----
-# This exercises the reentrancy guard: breakpoint at gdb_handler entry
-# triggers nested INT3, guard sets TF and single-steps out
 resp = send_recv(s, pkt("?"), wait=1.0)
 p = parse_pkt(resp)
-# Should respond with S05 (stop reply) — reentrancy guard let execution through
 if 'S05' in p:
     print("PASS: ? after breakpoint → S05 (reentrancy guard works)")
     ok += 1

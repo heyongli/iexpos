@@ -1,11 +1,50 @@
 #!/bin/bash
-# Test: framebuffer contains visible pixels (not all-black) after boot
-# Captures QEMU screendump via HMP monitor, samples non-zero pixel values.
-# QEMU -serial file: → wait "Graphics test complete" → screendump via monitor
-# → parse PPM sample bytes → non-zero sum = framebuffer has content.
+# Visual Output Verification Test
+# =================================
+#
+# Verifies that the framebuffer contains visible pixels (not all-black)
+# after boot, confirming that the graphics subsystem is producing output.
+#
+# Background
+# ----------
+# The kernel initializes VGA/VBE graphics and runs a demo that should produce
+# visible output on the framebuffer. This test captures a screendump and verifies
+# that the framebuffer is not all-zero (black).
+#
+# Test Method
+# -----------
+# 1. Boot kernel with serial output and HMP monitor
+# 2. Wait for "Graphics test complete" on serial
+# 3. Capture screendump via QEMU HMP monitor
+# 4. Parse PPM image file and check for non-zero pixels
+# 5. Use check_screendump.py for detailed pixel analysis
+#
+# Expected Results
+# ----------------
+# - Screendump file must be created
+# - PPM file must have valid header (P6 format)
+# - Framebuffer must contain visible content (non-zero pixel values)
+# - Output must show "PASS: all pixel checks passed"
+#
+# Environment
+# -----------
+# - Requires QEMU with KVM support
+# - Requires HMP monitor for screendump
+# - Requires check_screendump.py utility
+# - Uses -serial file: for output capture
+#
+# Usage
+# -----
+#     ./tests/visual.sh              # Build and run test
+#     ./tests/visual.sh --no-build   # Run without rebuilding
+#
+# Exit Status
+# -----------
+# - Returns 0 if framebuffer contains visible content
+# - Returns 1 if screendump fails or framebuffer is all-black
 set -e
 
-DIR=~/iexpos
+DIR=$(pwd)
 DISK=$DIR/build/vm-raw.img
 SER=/tmp/qemu-vm-serial
 SCR=/tmp/qemu-vm-screendump.ppm
