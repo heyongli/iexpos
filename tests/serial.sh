@@ -58,7 +58,7 @@ fi
 
 echo ""
 echo "=== Booting VM and capturing output ==="
-sg kvm -c "timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none" 2>&1 | tee $TMP_OUT
+timeout 12 qemu-system-x86_64 -enable-kvm -m 2G -nographic -smp 2 -vga std -drive file=$DISK,format=raw -net none 2>&1 | tee $TMP_OUT
 
 echo ""
 echo "=== Verifying output ==="
