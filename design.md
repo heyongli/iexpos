@@ -199,7 +199,4 @@ the code or doc that explains the problem.
   AMD. Need either an IPI + per-CPU flag, or a doc note restricting the
   closure to Intel. Current code calls `is_aborting()` which locally
   read-and-clears; cross-CPU abort needs an explicit IPI sender.
-- [ ] **Reorganise tests into closure dirs** — per-closure test suites
-  should live in `<closure>/tests/`; only kernel-level and global tests
-  in top-level `tests/`. Deferred until a full build run can validate the
-  test scripts at the new paths.
+

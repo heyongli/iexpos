@@ -49,7 +49,6 @@ I/O port reference: `docs/io-ports.md`.
 
 ### Medium Priority
 - [ ] **io abort: cross-CPU** (see `design.md` CR4 bit 24 — per-CPU on Intel, needs IPI)
-- [ ] **Reorganise tests into closure dirs** (see `design.md` — per-closure tests → `<closure>/tests/`)
 - [ ] **Remove `mdelay(5)` from orbit.c** (already done in working tree, verify no regression)
 
 ### Low Priority
