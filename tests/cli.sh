@@ -69,20 +69,21 @@ import socket, time
 
 PORT = 12355
 
-def send_recv(s, cmd, wait=2.0, timeout=5.0):
+def send_recv(s, cmd, timeout=2.0):
+    s.settimeout(0.5)
     s.sendall((cmd + '\n').encode())
-    time.sleep(wait)
     resp = b''
-    s.settimeout(timeout)
-    try:
-        while True:
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
             d = s.recv(4096)
-            if not d:
-                break
-            resp += d
-    except (socket.timeout, BlockingIOError):
-        pass
-    s.settimeout(10)
+        except socket.timeout:
+            continue
+        if not d:
+            break
+        resp += d
+        if resp.endswith(b'$ '):
+            break
     return resp.decode('ascii', errors='replace')
 
 s = socket.socket()
@@ -92,14 +93,15 @@ s.connect(('localhost', PORT))
 # Drain boot output and wait for CLI prompt
 buf = b''
 deadline = time.time() + 12
-try:
-    while b'$ ' not in buf and time.time() < deadline:
+s.settimeout(1)
+while b'$ ' not in buf and time.time() < deadline:
+    try:
         d = s.recv(4096)
-        if not d:
-            break
-        buf += d
-except socket.timeout:
-    pass
+    except socket.timeout:
+        continue
+    if not d:
+        break
+    buf += d
 
 if b"CLI ready" not in buf:
     # Might not see prompt (TCP lost early output), try sending a command

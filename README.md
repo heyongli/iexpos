@@ -28,9 +28,13 @@ kernel/       →  console abstraction + setup_main entry point
 ## Quick Start
 
 ```bash
-make all          # build
-./test.sh         # build + boot in QEMU + verify all test suites
-make run          # build + launch GUI window
+./tools/check-deps.sh --install   # install missing build/test dependencies
+make all                          # build
+./test.sh                         # build + boot in QEMU + verify all test suites
+make run                          # build + launch GUI window
 ```
 
-Dependencies: `nasm`, `gcc-multilib`, `qemu-system-x86`.
+Dependencies: `make`, `gcc`, `binutils`, `nasm`, `qemu-system-x86`, `gdb`,
+`socat`, `python3`, `iproute2`, `psmisc`. On WSL2, KVM needs the user in the
+`kvm` group (re-login after `./tools/check-deps.sh --install`); without it
+tests fall back to slow TCG emulation.

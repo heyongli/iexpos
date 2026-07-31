@@ -21,6 +21,7 @@
 #define elapsed_pit(start) \
     ((unsigned short)((start) - pit_read()))
 
+void pit_init(void);
 void mdelay(unsigned int ms);
 unsigned short pit_read(void);
 

@@ -10,6 +10,7 @@ static void write_dec(int val);
 
 void setup_main(void) {
     bm_puts("entry\n");
+    pit_init();
     bm_init();
     bm_puts("vga init done\n");
     ui_init();            /* register screen backend with console */

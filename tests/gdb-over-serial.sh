@@ -116,22 +116,26 @@ sleep 0.5
 [ -e "$PTY" ] || { echo "FAIL: PTY not created"; exit 1; }
 echo "  PTY created: $PTY"
 
-# Verify PTY can read kernel boot output
-echo "  Reading boot output via PTY..."
+# Verify PTY bridge works bidirectionally via the kernel CLI.
+# (Can't wait for boot markers: QEMU's -serial tcp drops output sent before
+# socat connects, so early markers are lost. The CLI is always active after
+# boot, so 'info' reliably produces a response.)
+echo "  Testing PTY bridge (send 'info' via PTY)..."
 ok=0
-deadline=$(($(date +%s) + 15))
+deadline=$(($(date +%s) + 10))
 while [ "$(date +%s)" -lt $deadline ]; do
     if [ -e "$PTY" ]; then
+        printf 'info\n' > "$PTY"
         chunk=$(timeout 1 dd bs=4096 count=1 if="$PTY" 2>/dev/null || true)
-        if echo "$chunk" | grep -q "Graphics test complete"; then
-            echo "  PASS: PTY bridge works, kernel booted"
+        if echo "$chunk" | grep -q "Resolution:"; then
+            echo "  PASS: PTY bridge works, kernel responds"
             ok=1
             break
         fi
     fi
     sleep 0.2
 done
-[ "$ok" -eq 1 ] || { echo "FAIL: PTY bridge did not receive boot output"; exit 1; }
+[ "$ok" -eq 1 ] || { echo "FAIL: PTY bridge did not receive kernel response"; exit 1; }
 
 # Test serial GDB stub with proper packet exchange
   echo "  Testing GDB stub packet echo..."

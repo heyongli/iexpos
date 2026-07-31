@@ -122,42 +122,40 @@ s = socket.socket()
 s.connect(('localhost', 12346))
 s.settimeout(15)
 
-# Drain boot output
+# Drain boot output (best effort). QEMU's -serial tcp drops output sent
+# before this socket connects, so early markers may be lost even though the
+# kernel booted fine -- the reliable liveness proof is the 'gdb\n' response
+# below.
 buf = b''
-deadline = time.time() + 12
+deadline = time.time() + 8
 try:
-    while b'Graphics test complete' not in buf and time.time() < deadline:
+    while b'$ ' not in buf and b'Graphics test complete' not in buf and time.time() < deadline:
         d = s.recv(4096)
         if not d: break
         buf += d
 except socket.timeout:
     pass
-if b'Graphics test complete' in buf:
+
+# Switch kernel from CLI to GDB mode. The kernel echoes the command and
+# prints "Switching to GDB mode." -- a response produced after we connect,
+# so it is never dropped.
+s.sendall(b'gdb\n')
+mode_buf = b''
+s.settimeout(0.5)
+try:
+    while True:
+        d = s.recv(4096)
+        if not d: break
+        mode_buf += d
+except: pass
+s.settimeout(15)
+
+if (b'Graphics test complete' in buf or
+        b'Switching to GDB mode' in mode_buf):
     print("PASS: boot output received")
     ok += 1
 else:
     print(f"WARN: boot output not seen ({len(buf)} bytes received)")
-
-# Drain any trailing boot output
-s.settimeout(0.5)
-time.sleep(0.2)
-try:
-    while True:
-        d = s.recv(4096)
-        if not d: break
-except: pass
-s.settimeout(15)
-
-# Switch kernel from CLI to GDB mode
-s.sendall(b'gdb\n')
-time.sleep(1)
-s.settimeout(0.5)
-try:
-    while True:
-        d = s.recv(4096)
-        if not d: break
-except: pass
-s.settimeout(15)
 
 # ---- Test 1: ? query → S05 stop reply ----
 resp = send_recv(s, pkt("?"))

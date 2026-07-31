@@ -44,8 +44,8 @@ I/O port reference: `docs/io-ports.md`.
 
 ### High Priority
 - [x] **GDB reentrancy** — fixed via `bp_remove_all()`/`bp_insert_all()` in trampoline
-- [ ] **PIT frame timing** — `elapsed_pit()` macro 16-bit wrap correctness, demo framerate limiter in `setup.c`
-- [ ] **Commit working tree** — gdb reentrancy, PIT timing, `is_aborting()` exit, gdb-over-serial test rewrite
+- [x] **PIT frame timing** — fixed: PIT channel 0 was never programmed, QEMU kept the counter frozen so `elapsed_pit()` never fired. Added `pit_init()` (count 0 = 65536 free-run) called from `setup.c`
+- [ ] **Commit working tree** — gdb reentrancy, PIT timing (fixed via `pit_init`), `is_aborting()` exit, gdb-over-serial test rewrite
 
 ### Medium Priority
 - [ ] **io abort: cross-CPU** (see `design.md` CR4 bit 24 — per-CPU on Intel, needs IPI)
@@ -76,7 +76,8 @@ I/O port reference: `docs/io-ports.md`.
 ### IO
 - COM1 0x3F8, polling (no IRQ). LSR+5: bit 5=THRE, bit 6=TEMT
 - UART loopback: MCR bit 4=LOOP
-- PIT 1.193182 MHz: `PIT_FRAME_TICKS = 16 * (1193182 / 1000)` ≈ 19090
+- PIT 1.193182 MHz: `PIT_FRAME_TICKS = 16 * (1193182 / 1000)` ≈ 19090
+- **Call `pit_init()` before using PIT** — unprogrammed channel 0 keeps the QEMU counter frozen (see `docs/io-ports.md`); count must be 0x0000 (65536 free-run), not 1
 - `elapsed_pit(start)` handles 16‑bit wrap via unsigned short subtraction
 
 ### Code
